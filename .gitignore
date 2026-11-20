@@ -1,4 +1,6 @@
-repo/
+repo/*
+!repo/*.pkg.tar.zst
+repo/maxx-desktop-*
 aur/
 out/
 .build/
