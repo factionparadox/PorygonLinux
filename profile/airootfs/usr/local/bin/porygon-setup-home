@@ -1,0 +1,154 @@
+#!/bin/bash
+# porygon-setup-home - run at each login (before MaXX starts). Lets MaXX
+# set up a new home the first time, then dresses it in Porygon's colours,
+# Toolchest menus, desktop icons and app settings. Each part runs once;
+# bump V to re-apply after a Porygon update.
+V=1
+S=${XDG_STATE_HOME:-$HOME/.local/state}/porygon
+mkdir -p "$S"
+SHARE=/usr/local/share/porygon
+
+# MaXX's own first-run setup (it normally does this itself and pops up a
+# notice; doing it here lets the Porygon welcome screen greet you instead)
+if [ ! -d "$HOME/.maxxdesktop" ]; then
+    mkdir -p "$HOME/.config"
+    /opt/MaXX/share/misc/HOME/initMaXX-Desktop-Home.sh >> "$HOME/.console" 2>&1
+fi
+
+# --- Toolchest: MaXX's menus plus Porygon's ---------------------------------
+make_chestrc() {
+    local live=""; [ -d /run/archiso ] && live=1
+    have() { command -v "$1" >/dev/null 2>&1; }
+    W='/opt/MaXX/bin/winterm'
+    {
+    echo "!! Porygon Toolchest menus - regenerated at each login by porygon-setup-home."
+    echo "!! Add your own menus below the last line; they're kept."
+    cat <<MENU
+Menu User
+{
+	"Porygon"		f.menu Porygon
+	"Applications"		f.menu Apps
+	"Demos"			f.menu Demos
+}
+MENU
+    cat <<MENU
+
+Menu Porygon
+{
+	"System Manager"	f.exec "porygon-welcome"
+	"What's New"		f.exec "porygon-evolved"
+	separator		f.separator
+	"Upgrade"		f.exec "$W bash -c 'upgrade; echo; read -n1 -rsp \"Press any key to close.\"'"
+	"Dubious Disc"		f.exec "$W bash -c 'dubious-disc; echo; read -n1 -rsp \"Press any key to close.\"'"
+	separator		f.separator
+	"Network Setup"		f.exec "$W nmtui"
+MENU
+    [ -n "$live" ] && printf '\t"Install Porygon"\tf.exec "%s bash -c '"'"'sudo porygon-install; read -n1 -rsp Done.'"'"'"\n' "$W"
+    cat <<MENU
+	separator		f.separator
+	"Porygon Colours"	f.exec "porygon-theme on"
+	"SGI Colours"		f.exec "porygon-theme off"
+	"Start-up Chime"	f.exec "porygon-chime"
+}
+
+Menu Apps
+{
+	"Web Browser"		f.exec "firefox"
+	"Music Player"		f.exec "qmmp"
+	"IRC Chat"		f.exec "$W irssi"
+	"Text Editor"		f.exec "/opt/MaXX/bin/xnedit"
+	"Image Viewer"		f.exec "/opt/MaXX/bin/imgviewer"
+MENU
+    have xpdf     && printf '\t"PDF Viewer"\t\tf.exec "xpdf"\n'
+    cat <<MENU
+	"Calculator"		f.exec "xcalc"
+	"Clock"			f.exec "xclock"
+	separator		f.separator
+	"Unix Shell"		f.exec "$W"
+	"System Monitor"	f.exec "/opt/MaXX/bin/gr_osview2 -title gr_osview"
+}
+
+Menu Demos
+{
+	"SGI Classics"		f.menu DemosSGI
+	"Polygons"		f.menu DemosPoly
+	"Screen Savers"		f.menu DemosSavers
+	"Mesa Demos"		f.menu DemosMesa
+}
+Menu DemosSGI
+{
+	"Atlantis"		f.exec "porygon-demo atlantis"
+	"Ideas in Motion"	f.exec "porygon-demo ideas"
+	"Flurry"		f.exec "porygon-demo flurry"
+	"Stonerview"		f.exec "porygon-demo stonerview"
+	"Forest Fire"		f.exec "porygon-demo forestfire"
+	"Gears"			f.exec "porygon-demo sgigears"
+}
+Menu DemosPoly
+{
+	"Polyhedra"		f.exec "porygon-demo polyhedra"
+	"Geodesic"		f.exec "porygon-demo geodesic"
+	"Morph 3D"		f.exec "porygon-demo morph3d"
+	"Platonic Folding"	f.exec "porygon-demo platonicfolding"
+	"Polytopes"		f.exec "porygon-demo polytopes"
+	"Superquadrics"		f.exec "porygon-demo superquadrics"
+	"Sierpinski 3D"		f.exec "porygon-demo sierpinski3d"
+	"Menger Sponge"		f.exec "porygon-demo menger"
+	"Moebius"		f.exec "porygon-demo moebius"
+}
+Menu DemosSavers
+{
+	"Pipes"			f.exec "porygon-demo pipes"
+	"Flying Toasters"	f.exec "porygon-demo toasters"
+	"Molecule"		f.exec "porygon-demo molecule"
+	"Sproingies"		f.exec "porygon-demo sproingies"
+	"Lament"		f.exec "porygon-demo lament"
+	"Boing"			f.exec "porygon-demo boing"
+	"Planet"		f.exec "porygon-demo planet"
+	"Engine"		f.exec "porygon-demo engine"
+	"Star Wars Crawl"	f.exec "porygon-demo starwars"
+}
+Menu DemosMesa
+{
+	"Teapot"		f.exec "porygon-demo teapot"
+	"Gloss"			f.exec "porygon-demo gloss"
+	"Isosurface"		f.exec "porygon-demo isosurf"
+	"Reflect"		f.exec "porygon-demo reflect"
+	"Tunnel"		f.exec "porygon-demo tunnel"
+	"Fire"			f.exec "porygon-demo fire"
+}
+MENU
+    echo "!! ---- your own changes below this line ----"
+    } > "$1"
+}
+# regenerate the Porygon part each login (so it follows MaXX updates),
+# keeping anything the user added below the marker line
+if [ -f "$HOME/.chestrc" ] && grep -q '^!! Porygon Toolchest' "$HOME/.chestrc"; then
+    sed -n '/^!! ---- your own changes below this line ----/,$p' "$HOME/.chestrc" | tail -n +2 > "$S/chestrc.user"
+elif [ -f "$HOME/.chestrc" ]; then
+    cp "$HOME/.chestrc" "$S/chestrc.maxx-original"; : > "$S/chestrc.user"
+else
+    : > "$S/chestrc.user"
+fi
+make_chestrc "$HOME/.chestrc"
+cat "$S/chestrc.user" >> "$HOME/.chestrc"
+
+[ -e "$S/home-v$V" ] && exit 0
+
+# --- colours and backdrop ---------------------------------------------------
+PORYGON_QUIET=1 porygon-theme on >/dev/null 2>&1
+
+# --- desktop icons ----------------------------------------------------------
+PB=$HOME/.config/rox.sourceforge.net/ROX-Filer/pb_myspace
+GI=$HOME/.config/rox.sourceforge.net/ROX-Filer/globicons
+if [ -f "$PB" ] && ! grep -q porygon-welcome "$PB"; then
+    sed -i 's|</pinboard>|  <icon x="224" y="32" label="Welcome">/usr/local/bin/porygon-welcome</icon>\n  <icon x="224" y="160" label="Demos">/usr/local/bin/porygon-demos-folder</icon>\n  <icon x="224" y="288" label="Whats New">/usr/local/bin/porygon-evolved</icon>\n</pinboard>|' "$PB"
+fi
+if [ -f "$GI" ] && ! grep -q porygon-welcome "$GI"; then
+    sed -i "s|</special-files>|  <rule match=\"/usr/local/bin/porygon-welcome\">\n    <icon>$SHARE/icons/welcome-128.png</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-demos-folder\">\n    <icon>$SHARE/icons/demos-128.png</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-evolved\">\n    <icon>$SHARE/icons/evolve-128.png</icon>\n  </rule>\n</special-files>|" "$GI"
+fi
+
+# (Firefox gets its 1990s look from /usr/lib/firefox/browser/defaults/profile,
+#  which Firefox copies into every new profile.)
+
+touch "$S/home-v$V"

@@ -1,0 +1,17 @@
+#!/bin/bash
+# The desktop's Demos icon: a little chooser listing every demo.
+exec python3 - <<'PY'
+import subprocess, tkinter as tk
+BG, PANEL, FIELD, PINK, INK = "#d9d3dd", "#c3bccb", "#f0c4d0", "#ec849d", "#1a1020"
+names = subprocess.run(["porygon-demo", "--list"], capture_output=True, text=True).stdout.split()
+r = tk.Tk(); r.title("Demos"); r.configure(bg=BG); r.geometry("300x460")
+tk.Label(r, text="3D Demos", font=("Helvetica", 16, "bold italic"), bg=PINK, fg=INK, bd=2, relief="raised").pack(fill="x")
+tk.Label(r, text="Double-click to run", font=("Helvetica", 10, "italic"), bg=BG).pack(pady=4)
+f = tk.Frame(r, bd=2, relief="sunken"); f.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+sb = tk.Scrollbar(f); sb.pack(side="right", fill="y")
+lb = tk.Listbox(f, bg=FIELD, fg=INK, font=("Helvetica", 12), selectbackground=PINK, yscrollcommand=sb.set, bd=0, activestyle="none")
+lb.pack(fill="both", expand=True); sb.config(command=lb.yview)
+for n in sorted(names): lb.insert("end", n)
+lb.bind("<Double-Button-1>", lambda e: lb.curselection() and subprocess.Popen(["porygon-demo", lb.get(lb.curselection()[0])]))
+r.mainloop()
+PY

@@ -12,7 +12,8 @@
 # For the MaXX desktop and other AUR parts, use: dubious-disc
 cmd=${1:-update}; shift 2>/dev/null
 case $cmd in
-  update|-u)      pamac upgrade ;;
+  update|-u)      start=$(date +%Y-%m-%dT%H:%M:%S)
+                  pamac upgrade && porygon-record-evolution upgrade "$start" ;;
   install|in|-i)  pamac install "$@" ;;
   remove|rm|-r)   pamac remove -o "$@" ;;
   search|s|-s)    if [ "${1:-}" = --aur ]; then shift; pamac search -a "$@"; else pamac search "$@"; fi ;;

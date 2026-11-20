@@ -1,0 +1,11 @@
+# Rebuild Porygon's colour scheme whenever MaXX is installed or updated
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = maxx-desktop
+
+[Action]
+Description = Building the Porygon colour scheme...
+When = PostTransaction
+Exec = /usr/local/bin/porygon-make-scheme

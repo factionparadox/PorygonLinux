@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Builds MaXX's "Porygon" colour scheme and matching GTK theme on this
+machine, from the Indigo Magic ones MaXX ships: pink active title bars,
+blue drawing areas, lavender-grey panels. Run by a pacman hook whenever
+maxx-desktop is installed or updated, so it always matches the
+installed MaXX.
+"""
+import os, re, shutil, sys
+
+MAXX = "/opt/MaXX/share"
+SRC_SCHEME = f"{MAXX}/X11/schemes/IndigoMagic/BaseColorPalette"
+DST_SCHEME = f"{MAXX}/X11/schemes/Porygon/BaseColorPalette"
+SRC_GTK, DST_GTK = f"{MAXX}/themes/IndigoMagic", f"{MAXX}/themes/Porygon"
+
+OURS = {  # used as-is in every gamma block: MaXX loads the 1.7 one, and
+          # scaling it like Indigo Magic does turns the pink muddy
+    "BasicBackground": "#d9d3dd", "TextFieldBackground": "#f0c4d0", "ReadOnlyBackground": "#c3bccb",
+    "ButtonBackground": "#c3bccb", "ScrollBarTroughColor": "#b4adbd", "ScrollBarControlBackground": "#c3bccb",
+    "IndicatorBackground": "#d0cad7", "RadioColor": "#3f7fc2", "CheckColor": "#d4506f",
+    "DrawingAreaBackground": "#7aa3cc", "ScrolledListBackground": "#c3bccb", "TextBackground": "#bcb5c5",
+    "WMBackground": "#a3b8d2", "WMActiveBackground": "#ec849d", "WMActiveForeground": "#1a1020",
+    "TextSelectedBackground": "#f6dce3", "AlternateBackground1": "#d6b3bf", "AlternateBackground5": "#8db3d8",
+    "LightRadioFillColor": "#9ec2e6", "DisabledCheckColor": "#e6a9b8",
+}
+GTK_SWAP = {  # Indigo Magic GTK colour -> Porygon
+    "#a52a2a": "#c4587a", "#d9d9d9": "#d9d3dd", "#b98e8e": "#f0c4d0", "#9fbfbf": "#c3bccb",
+    "#c2c2c2": "#cfc9d6", "#bdbdbd": "#c3bccb",
+}
+
+if not os.path.exists(SRC_SCHEME):
+    sys.exit(0)  # MaXX isn't installed (yet)
+
+src = open(SRC_SCHEME).read()
+parts = re.split(r"(#ifdef GAMMA_[0-9_]+\n)", src)
+def sub(m):
+    k, v = m.group(1), m.group(2)
+    if k not in OURS: return m.group(0)
+    return "#define %s %s" % (k, OURS[k])
+out = "".join(re.sub(r"#define (\w+) (#[0-9a-fA-F]{6})", sub, p) for p in parts)
+out = re.sub(r"#define SchemeDescription .*", "#define SchemeDescription Porygon: pink and blue, rendered in polygons", out)
+os.makedirs(os.path.dirname(DST_SCHEME), exist_ok=True)
+open(DST_SCHEME, "w").write(out)
+
+if os.path.isdir(SRC_GTK):
+    shutil.rmtree(DST_GTK, ignore_errors=True)
+    shutil.copytree(SRC_GTK, DST_GTK, symlinks=True)
+    for d, _, files in os.walk(DST_GTK):
+        for f in files:
+            p = os.path.join(d, f)
+            if os.path.islink(p) or not f.endswith((".css", ".svg", "gtkrc", ".theme", ".rc")):
+                continue
+            s = open(p, errors="surrogateescape").read()
+            t = s.replace("IndigoMagic", "Porygon")
+            for a, b in GTK_SWAP.items():
+                t = re.sub(re.escape(a), b, t, flags=re.I)
+            if t != s:
+                open(p, "w", errors="surrogateescape").write(t)
+print("Porygon colour scheme ready.")

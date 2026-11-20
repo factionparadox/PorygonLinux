@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""What's New: the evolution report shown after `upgrade` or `dubious-disc`.
+
+Reads ~/.local/state/porygon/last-evolution, written by those commands:
+first line is the kind of run (upgrade or dubious-disc), then one line
+per package change taken from pacman's log.
+"""
+import os, sys
+import tkinter as tk
+
+F = os.path.expanduser("~/.local/state/porygon/last-evolution")
+BG, PANEL, FIELD, PINK, BLUE_DARK, INK = "#d9d3dd", "#c3bccb", "#f0c4d0", "#ec849d", "#265284", "#1a1020"
+
+kind, changes = "none", []
+if os.path.exists(F):
+    lines = open(F).read().splitlines()
+    if lines:
+        kind, changes = lines[0], [l for l in lines[1:] if l.strip()]
+
+if kind == "dubious-disc":
+    headline, sub = "Porygon2 evolved into Porygon-Z!", "The full evolution: system, desktop and all."
+elif kind == "upgrade":
+    headline, sub = "Porygon evolved into Porygon2!", "Your system was upgraded."
+else:
+    headline, sub = "Nothing has evolved yet.", "Run upgrade or dubious-disc in a winterm."
+if kind != "none" and not changes:
+    headline, sub = "Already fully evolved.", "Everything was up to date - nothing changed."
+
+up = [c for c in changes if c.startswith("upgraded")]
+new = [c for c in changes if c.startswith("installed")]
+gone = [c for c in changes if c.startswith("removed")]
+
+root = tk.Tk()
+root.title("What's New")
+root.configure(bg=BG)
+root.geometry("620x440")
+root.option_add("*Font", ("Helvetica", 11))
+strip = tk.Frame(root, bg=PINK, bd=2, relief="raised"); strip.pack(fill="x")
+try:
+    ic = tk.PhotoImage(file="/usr/local/share/porygon/icons/evolve-48.png")
+    tk.Label(strip, image=ic, bg=PINK).pack(side="left", padx=10, pady=4)
+except tk.TclError:
+    pass
+box = tk.Frame(strip, bg=PINK); box.pack(side="left", pady=6)
+tk.Label(box, text=headline, font=("Helvetica", 17, "bold italic"), bg=PINK, fg=INK).pack(anchor="w")
+tk.Label(box, text=sub, font=("Helvetica", 11, "italic"), bg=PINK, fg=INK).pack(anchor="w")
+
+summary = f"{len(up)} upgraded   •   {len(new)} new   •   {len(gone)} removed" if changes else ""
+tk.Label(root, text=summary, bg=BG, fg=BLUE_DARK, font=("Helvetica", 12, "bold")).pack(anchor="w", padx=12, pady=(10, 4))
+frame = tk.Frame(root, bd=2, relief="sunken"); frame.pack(fill="both", expand=True, padx=12)
+sb = tk.Scrollbar(frame, bg=PANEL, troughcolor="#b4adbd"); sb.pack(side="right", fill="y")
+lst = tk.Listbox(frame, bg=FIELD, fg=INK, font=("Courier", 10), yscrollcommand=sb.set, bd=0,
+                 selectbackground=PINK, activestyle="none")
+lst.pack(fill="both", expand=True); sb.config(command=lst.yview)
+for group in (up, new, gone):
+    for c in group:
+        lst.insert("end", "  " + c)
+tk.Button(root, text="Close", command=root.destroy, bg=PANEL, activebackground=FIELD, bd=2,
+          padx=14, font=("Helvetica", 11, "bold")).pack(side="right", padx=12, pady=10)
+root.mainloop()

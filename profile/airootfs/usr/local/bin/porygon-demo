@@ -1,0 +1,29 @@
+#!/bin/bash
+# porygon-demo NAME - opens one of the 3D demos in its own window.
+# porygon-demo --list shows them all.
+G="-geometry 900x640"
+X=/usr/lib/xscreensaver
+M=/opt/MaXX/bin/demos
+declare -A D=(
+  # the SGI classics, shipped with MaXX
+  [atlantis]="$M/atlantis"   [ideas]="$M/ideas"   [flurry]="$M/flurry"
+  [stonerview]="$M/stonerview"   [forestfire]="$M/glforestfire"   [sgigears]="$M/gears"
+  # polygons (from xscreensaver)
+  [polyhedra]="$X/polyhedra $G"   [geodesic]="$X/geodesic $G"   [morph3d]="$X/morph3d $G"
+  [superquadrics]="$X/superquadrics $G"   [sierpinski3d]="$X/sierpinski3d $G"   [menger]="$X/menger $G"
+  [platonicfolding]="$X/platonicfolding $G"   [polytopes]="$X/polytopes $G"   [moebius]="$X/moebius $G"
+  # 1990s screen-saver favourites
+  [pipes]="$X/pipes $G"   [molecule]="$X/molecule $G"   [sproingies]="$X/sproingies $G"
+  [toasters]="$X/flyingtoasters $G"   [lament]="$X/lament $G"   [boing]="$X/boing $G"
+  [planet]="$X/glplanet $G"   [engine]="$X/engine $G"   [starwars]="$X/starwars $G"
+  # Mesa's own test demos
+  [teapot]="/usr/bin/teapot"   [gloss]="/usr/bin/gloss"   [isosurf]="/usr/bin/isosurf"
+  [reflect]="/usr/bin/reflect"   [tunnel]="/usr/bin/tunnel"   [fire]="/usr/bin/fire"
+)
+if [ "${1:-}" = --list ] || [ -z "${1:-}" ]; then
+    printf '%s\n' "${!D[@]}" | sort | column; exit 0
+fi
+cmd=${D[$1]:-}
+[ -n "$cmd" ] || { echo "porygon-demo: no demo called '$1' (try --list)"; exit 1; }
+cd /usr/share/mesa-demos 2>/dev/null || cd /tmp   # Mesa's demos look for textures in the working dir
+exec $cmd

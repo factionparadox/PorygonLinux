@@ -25,4 +25,13 @@ file_permissions=(
   ["/usr/local/bin/upgrade"]="0:0:755"
   ["/usr/local/bin/dubious-disc"]="0:0:755"
   ["/usr/local/bin/porygon-install"]="0:0:755"
+  ["/usr/local/bin/porygon-welcome"]="0:0:755"
+  ["/usr/local/bin/porygon-evolved"]="0:0:755"
+  ["/usr/local/bin/porygon-record-evolution"]="0:0:755"
+  ["/usr/local/bin/porygon-demo"]="0:0:755"
+  ["/usr/local/bin/porygon-demos-folder"]="0:0:755"
+  ["/usr/local/bin/porygon-chime"]="0:0:755"
+  ["/usr/local/bin/porygon-theme"]="0:0:755"
+  ["/usr/local/bin/porygon-setup-home"]="0:0:755"
+  ["/usr/local/bin/porygon-make-scheme"]="0:0:755"
 )

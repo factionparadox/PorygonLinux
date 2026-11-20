@@ -21,6 +21,7 @@ edk2-shell
 memtest86+
 memtest86+-efi
 sudo
+which
 man-db
 man-pages
 nano
@@ -97,6 +98,14 @@ libtiff5
 gtk2
 maxx-desktop
 # --- apps ---
+python
+tk
+xscreensaver
+mesa-demos
+qmmp
+irssi
+xorg-xcalc
+xorg-xclock
 pamac-cli
 firefox
 xpdf

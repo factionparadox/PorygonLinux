@@ -1,0 +1,15 @@
+#!/bin/bash
+# porygon-record-evolution KIND START
+# Saves what pacman changed since START (YYYY-MM-DDTHH:MM:SS) for the
+# What's New window, then opens it if there's a desktop to open it on.
+kind=$1 start=$2
+S=${XDG_STATE_HOME:-$HOME/.local/state}/porygon
+mkdir -p "$S"
+{
+  echo "$kind"
+  awk -v s="$start" '
+    substr($1, 2, 19) >= s && $2 == "[ALPM]" && ($3 == "upgraded" || $3 == "installed" || $3 == "removed") {
+      $1 = ""; $2 = ""; sub(/^  /, ""); print }' /var/log/pacman.log
+} > "$S/last-evolution"
+[ -n "${DISPLAY:-}" ] && (porygon-evolved >/dev/null 2>&1 &)
+true

@@ -2,6 +2,11 @@
 # Porygon X session. Lives here rather than ~/.xinitrc because MaXX's
 # first-run setup replaces ~/.xinitrc with its own.
 export USERNAME=$USER   # MaXX greets you by this name
+export PATH=/usr/local/bin:$PATH
+porygon-setup-home
 # laptop keys (brightness, volume) - 5Dwm doesn't handle them itself
 xbindkeys -f /etc/porygon/xbindkeysrc &
+# the start-up chime, then the System Manager on first login
+(sleep 3; porygon-chime) &
+(sleep 9; porygon-welcome --first-login) &
 exec /opt/MaXX/etc/skel/Xsession.dt

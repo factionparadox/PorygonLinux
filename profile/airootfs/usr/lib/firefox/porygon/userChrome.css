@@ -1,0 +1,45 @@
+/* Porygon: Firefox dressed as a 1990s workstation browser.
+   Square corners, bevelled grey toolbars, Helvetica, a pink selected tab.
+   Copied into each Firefox profile by porygon.cfg; edit your profile's
+   chrome/userChrome.css to change it (Porygon won't overwrite it). */
+:root {
+  --p-panel: #c3bccb; --p-bg: #d9d3dd; --p-light: #f4f0f6; --p-dark: #6e6878;
+  --p-pink: #ec849d; --p-field: #f0c4d0; --p-ink: #1a1020;
+  --tab-border-radius: 0 !important;
+  --toolbarbutton-border-radius: 0 !important;
+  --toolbar-bgcolor: var(--p-panel) !important;
+  --toolbar-color: var(--p-ink) !important;
+  --toolbox-bgcolor: var(--p-panel) !important;
+  --toolbox-bgcolor-inactive: var(--p-panel) !important;
+  --tab-selected-bgcolor: var(--p-pink) !important;
+  --toolbar-field-background-color: var(--p-field) !important;
+  --toolbar-field-focus-background-color: #fbe6ec !important;
+  --toolbar-field-color: var(--p-ink) !important;
+  --arrowpanel-background: var(--p-bg) !important;
+  --arrowpanel-color: var(--p-ink) !important;
+  --arrowpanel-border-radius: 0 !important;
+}
+* { font-family: Helvetica, "Nimbus Sans", sans-serif !important; }
+#navigator-toolbox, #TabsToolbar, #nav-bar, #PersonalToolbar {
+  background: var(--p-panel) !important;
+  border-top: 2px solid var(--p-light) !important;
+  border-bottom: 2px solid var(--p-dark) !important;
+}
+.tab-background {
+  border-radius: 0 !important; margin-block: 2px !important;
+  border: 2px outset var(--p-bg) !important; box-shadow: none !important;
+  background: var(--p-panel) !important;
+}
+.tabbrowser-tab[selected] .tab-background { border-style: inset !important; background: var(--p-pink) !important; }
+.tab-label { font-style: italic !important; color: var(--p-ink) !important; }
+#urlbar-background, #searchbar {
+  border-radius: 0 !important; border: 2px inset var(--p-bg) !important;
+  background: var(--p-field) !important;
+}
+toolbarbutton .toolbarbutton-icon, toolbarbutton .toolbarbutton-badge-stack { border-radius: 0 !important; }
+toolbarbutton:hover > .toolbarbutton-icon, toolbarbutton:hover > .toolbarbutton-badge-stack {
+  background: var(--p-bg) !important; outline: 2px outset var(--p-light) !important;
+}
+toolbarbutton:active > .toolbarbutton-icon, toolbarbutton[open] > .toolbarbutton-icon {
+  outline: 2px inset var(--p-dark) !important;
+}

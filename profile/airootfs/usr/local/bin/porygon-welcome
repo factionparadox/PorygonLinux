@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""Porygon System Manager - the welcome screen.
+
+Laid out like a 1990s workstation's system manager: a category list on
+the left, the selected category's page on the right, and plain buttons
+that do things. Opens on first login (and on later logins until
+"Show at login" is unticked).
+"""
+import os, subprocess, sys, shutil, platform
+import tkinter as tk
+
+STATE = os.path.expanduser("~/.local/state/porygon")
+NOSHOW = os.path.join(STATE, "welcome-hidden")
+SHARE = "/usr/local/share/porygon"
+LIVE = os.path.isdir("/run/archiso")
+
+# colours from the Porygon scheme
+BG, PANEL, FIELD = "#d9d3dd", "#c3bccb", "#f0c4d0"
+PINK, PINK_DARK, BLUE, BLUE_DARK, INK = "#ec849d", "#b04a68", "#5496ce", "#265284", "#1a1020"
+FONT = ("Helvetica", 11)
+FONT_B = ("Helvetica", 11, "bold")
+HEAD = ("Helvetica", 18, "bold italic")
+SUB = ("Helvetica", 12, "italic")
+
+if "--first-login" in sys.argv and os.path.exists(NOSHOW):
+    sys.exit(0)
+
+
+def term(*cmd, hold=True):
+    """Run a command in a winterm, keeping it open afterwards."""
+    line = " ".join(cmd)
+    if hold:
+        line += "; echo; read -n1 -rsp 'Press any key to close this window.'"
+    winterm = "/opt/MaXX/bin/winterm"
+    exe = [winterm] if os.path.exists(winterm) else ["xterm", "-e"]
+    subprocess.Popen(exe + ["bash", "-c", line])
+
+
+def run(*cmd):
+    subprocess.Popen(list(cmd), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def kernel():
+    return platform.release()
+
+
+def maxx_version():
+    try:
+        return open("/opt/MaXX/etc/version").read().split()[0]
+    except Exception:
+        return "2.2"
+
+
+PAGES = [
+    ("welcome", "Welcome", "Getting Started", [
+        "Porygon is a 1990s graphics workstation, rendered in polygons.",
+        "",
+        "The desktop is the MaXX Interactive Desktop, a licensed recreation of "
+        "the Indigo Magic desktop that shipped on SGI machines. The Toolchest "
+        "(top left) is your menu: everything lives there, including Porygon's "
+        "own menu and the Demos.",
+        "",
+        "A few things to try:",
+        "  •  Toolchest → Demos, for the polygons",
+        "  •  Double-click winterm on the desktop for a shell",
+        "  •  Right-click the desktop for the background menu",
+    ], [("Show the Toolchest's Demos", lambda: show("demos"))]),
+    ("network", "Network", "Connect to Wi-Fi", [
+        "Porygon uses NetworkManager. The network setup runs in a terminal "
+        "(it's 1996, after all): pick “Activate a connection”, choose "
+        "your network and type the password.",
+    ], [("Open Network Setup", lambda: term("nmtui", hold=False))]),
+    ("install", "Install", "Install Porygon", [
+        "You're running Porygon from the USB stick. The installer copies this "
+        "system onto a disk you choose by number.",
+        "",
+        "It ERASES that whole disk, and it needs the USB to have been started "
+        "in UEFI mode. When it's done, remove the USB and reboot - you'll land "
+        "straight back in this desktop.",
+    ], [("Run the Installer", lambda: term("sudo", "porygon-install"))]),
+    ("software", "Software", "Software Manager", [
+        "Two ways to evolve:",
+        "",
+        "  upgrade  —  updates the system from Manjaro's repositories.",
+        "  dubious-disc  —  the full evolution: the system, then the MaXX "
+        "desktop and the other AUR parts if there are newer versions.",
+        "",
+        "Afterwards, Toolchest → Porygon → What's New shows what changed.",
+    ], [("Update System", lambda: term("upgrade")),
+        ("Full Evolution", lambda: term("dubious-disc")),
+        ("What's New", lambda: run("porygon-evolved"))]),
+    ("demos", "Demos", "3D Demos", [
+        "SGI workstations were the polygon machines of the 1990s, and these "
+        "demos are why people stood around them in shops. Each one opens in "
+        "its own window; close it to stop.",
+    ], [("Atlantis", lambda: run("porygon-demo", "atlantis")),
+        ("Ideas in Motion", lambda: run("porygon-demo", "ideas")),
+        ("Polyhedra", lambda: run("porygon-demo", "polyhedra")),
+        ("Pipes", lambda: run("porygon-demo", "pipes"))]),
+    ("look", "Look", "Look & Feel", [
+        "Porygon starts with its own pink-and-blue colour scheme and a "
+        "low-poly backdrop. MaXX can switch between the classic SGI schemes "
+        "(Indigo Magic, Rembrandt, Gotham and more) and between its Classic "
+        "and Modern looks.",
+        "",
+        "Want the original look back? Run porygon-theme off in a winterm; "
+        "porygon-theme on brings Porygon back.",
+    ], [("Desktop Settings", lambda: run("/opt/MaXX/bin/desktop")),
+        ("Porygon Colours", lambda: run("porygon-theme", "on")),
+        ("SGI Colours", lambda: run("porygon-theme", "off"))]),
+    ("about", "About", "About Porygon", [
+        "Porygon (Manjaro edition)",
+        "",
+        f"Kernel {kernel()}  •  MaXX Interactive Desktop {maxx_version()}",
+        "Base: Manjaro stable  •  Root filesystem: XFS",
+        "",
+        "The MaXX Interactive Desktop is © Eric Masson, used under its own "
+        "licence. Porygon is a fan project and isn't endorsed by MaXX "
+        "Interactive, SGI, Manjaro or Nintendo.",
+    ], []),
+]
+if not LIVE:
+    PAGES = [p for p in PAGES if p[0] != "install"]
+
+root = tk.Tk()
+root.title("Porygon System Manager")
+root.configure(bg=BG)
+root.geometry("780x520+290+120")
+root.minsize(680, 480)
+root.option_add("*Font", FONT)
+root.option_add("*Background", BG)
+root.option_add("*Foreground", INK)
+root.option_add("*activeBackground", FIELD)
+root.option_add("*highlightThickness", 0)
+
+icons = {}
+for name in ("welcome", "demos", "evolve"):
+    try:
+        icons[name] = tk.PhotoImage(file=f"{SHARE}/icons/{name}-48.png")
+    except tk.TclError:
+        pass
+ICON_FOR = {"welcome": "welcome", "demos": "demos", "software": "evolve", "install": "evolve"}
+
+# --- title strip: pink, like an active title bar ---
+strip = tk.Frame(root, bg=PINK, height=54, bd=2, relief="raised")
+strip.pack(fill="x")
+if "welcome" in icons:
+    tk.Label(strip, image=icons["welcome"], bg=PINK).pack(side="left", padx=(10, 6), pady=2)
+tk.Label(strip, text="Porygon", font=HEAD, bg=PINK, fg=INK).pack(side="left")
+tk.Label(strip, text="System Manager", font=SUB, bg=PINK, fg=INK).pack(side="left", padx=8, pady=(8, 0))
+
+body = tk.Frame(root, bg=BG)
+body.pack(fill="both", expand=True, padx=10, pady=10)
+
+# --- category list (left) ---
+left = tk.Frame(body, bg=PANEL, bd=2, relief="sunken")
+left.pack(side="left", fill="y")
+buttons = {}
+
+# --- page (right) ---
+right = tk.Frame(body, bg=BG, bd=2, relief="groove")
+right.pack(side="left", fill="both", expand=True, padx=(10, 0))
+title_row = tk.Frame(right, bg=BG)
+title_row.pack(fill="x", padx=14, pady=(12, 4))
+page_icon = tk.Label(title_row, bg=BG)
+page_icon.pack(side="left")
+page_title = tk.Label(title_row, font=HEAD, bg=BG, fg=BLUE_DARK)
+page_title.pack(side="left", padx=8)
+tk.Frame(right, height=2, bg=PINK).pack(fill="x", padx=14)
+text = tk.Label(right, justify="left", anchor="nw", bg=BG, wraplength=470)
+text.pack(fill="both", expand=True, padx=16, pady=10)
+actions = tk.Frame(right, bg=BG)
+actions.pack(fill="x", padx=14, pady=(0, 12))
+
+
+def show(key):
+    for k, b in buttons.items():
+        b.configure(bg=PINK if k == key else PANEL, relief="sunken" if k == key else "flat")
+    page = next(p for p in PAGES if p[0] == key)
+    _, _, title, lines, acts = page
+    page_title.configure(text=title)
+    ic = icons.get(ICON_FOR.get(key, ""), "")
+    page_icon.configure(image=ic)
+    text.configure(text="\n".join(lines))
+    for w in actions.winfo_children():
+        w.destroy()
+    for label, fn in acts:
+        tk.Button(actions, text=label, command=fn, bg=PANEL, activebackground=FIELD,
+                  bd=2, relief="raised", padx=10, pady=3, font=FONT_B).pack(side="left", padx=(0, 8))
+
+
+for key, label, *_ in PAGES:
+    b = tk.Button(left, text=label, anchor="w", width=12, bd=1, relief="flat", bg=PANEL,
+                  activebackground=FIELD, font=FONT_B, command=lambda k=key: show(k))
+    b.pack(fill="x", padx=4, pady=2)
+    buttons[key] = b
+
+# --- bottom row ---
+bottom = tk.Frame(root, bg=BG)
+bottom.pack(fill="x", padx=10, pady=(0, 10))
+show_var = tk.IntVar(value=0 if os.path.exists(NOSHOW) else 1)
+
+
+def toggle():
+    os.makedirs(STATE, exist_ok=True)
+    if show_var.get():
+        if os.path.exists(NOSHOW):
+            os.remove(NOSHOW)
+    else:
+        open(NOSHOW, "w").close()
+
+
+tk.Checkbutton(bottom, text="Show at login", variable=show_var, command=toggle, bg=BG,
+               selectcolor=FIELD, activebackground=BG).pack(side="left")
+tk.Button(bottom, text="Close", command=root.destroy, bg=PANEL, activebackground=FIELD,
+          bd=2, relief="raised", padx=14, font=FONT_B).pack(side="right")
+
+show("welcome")
+root.mainloop()

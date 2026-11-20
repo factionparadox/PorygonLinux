@@ -1,0 +1,5 @@
+#!/bin/sh
+# Plays the Porygon start-up chime (once per login). Quiet if muted or
+# if ~/.local/state/porygon/chime-off exists.
+[ -e "${XDG_STATE_HOME:-$HOME/.local/state}/porygon/chime-off" ] && exit 0
+exec pw-play /usr/local/share/porygon/chime.wav 2>/dev/null || exec aplay -q /usr/local/share/porygon/chime.wav 2>/dev/null

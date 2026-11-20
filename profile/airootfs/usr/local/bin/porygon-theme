@@ -1,0 +1,22 @@
+#!/bin/bash
+# porygon-theme on|off - switch between Porygon's colours and backdrop and
+# MaXX's original SGI look. Takes full effect at the next login.
+set -e
+export MAXX_HOME=/opt/MaXX MAXX_BIN=/opt/MaXX/bin PATH=/opt/MaXX/bin:$PATH   # msettings needs these
+P=$HOME/.config/rox.sourceforge.net/ROX-Filer/pb_myspace
+WALL=/usr/local/share/porygon/backgrounds/porygon-2880x1920.png
+case ${1:-on} in
+  on)  scheme=Porygon     back="<backdrop style=\"Stretched\">$WALL</backdrop>" ;;
+  off) scheme=IndigoMagic back="<backdrop style=\"Tiled\">/opt/MaXX/share/wallpapers/tiles/scatter-purple.png</backdrop>" ;;
+  *)   echo "usage: porygon-theme on|off"; exit 1 ;;
+esac
+msettings S Desktop.Colors.SgiScheme=$scheme >/dev/null 2>&1 || true
+if [ -f "$P" ]; then
+    sed -i "s|<backdrop[^>]*>[^<]*</backdrop>|$back|" "$P"
+    grep -q '<backdrop' "$P" || sed -i "s|<pinboard>|<pinboard>\n  $back|" "$P"
+fi
+if [ -n "${DISPLAY:-}" ] && [ -x /opt/MaXX/bin/xconfirm ]; then
+    [ -n "${PORYGON_QUIET:-}" ] || /opt/MaXX/bin/xconfirm -c -icon info -t "Colours set to $scheme. Log out and back in to see them everywhere." >/dev/null 2>&1 &
+else
+    echo "Colours set to $scheme. Log out and back in to see them everywhere."
+fi
