@@ -21,7 +21,6 @@ file_permissions=(
   ["/root"]="0:0:750"
   ["/root/.gnupg"]="0:0:700"
   ["/etc/porygon/session"]="0:0:755"
-  ["/usr/local/bin/choose-mirror"]="0:0:755"
   ["/usr/local/bin/livecd-sound"]="0:0:755"
   ["/usr/local/bin/upgrade"]="0:0:755"
   ["/usr/local/bin/dubious-disc"]="0:0:755"

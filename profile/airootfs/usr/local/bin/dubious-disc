@@ -1,23 +1,6 @@
 #!/bin/bash
-# dubious-disc - full evolution: the system update, then rebuilds Porygon's
-# AUR packages (MaXX desktop, gtk2 and the old libraries it needs) if the
-# AUR has newer versions.
-set -euo pipefail
+# dubious-disc - full evolution: updates the system, then rebuilds Porygon's
+# AUR packages (the MaXX desktop, gtk2 and the old libraries it needs) when
+# the AUR has newer versions. Manjaro's pamac does the work.
 [ "$(id -u)" = 0 ] && { echo "Run dubious-disc as your normal user, not root."; exit 1; }
-PKGS=(ncurses5-compat-libs libjpeg6-turbo libpng15 libtiff5 gtk2 maxx-desktop)
-W=${XDG_CACHE_HOME:-$HOME/.cache}/dubious-disc
-mkdir -p "$W"
-echo ":: Updating the system"
-sudo pacman -Syu --noconfirm
-sudo pacman -S --needed --noconfirm base-devel git >/dev/null
-built=()
-for p in "${PKGS[@]}"; do
-    if [ -d "$W/$p" ]; then git -C "$W/$p" pull -q; else git clone -q "https://aur.archlinux.org/$p.git" "$W/$p"; fi
-    new=$(cd "$W/$p" && source PKGBUILD && echo "$pkgver-$pkgrel")
-    have=$(pacman -Q "$p" 2>/dev/null | cut -d' ' -f2 || true)
-    if [ "$new" = "$have" ]; then echo ":: $p $have is current"; continue; fi
-    echo ":: Evolving $p ${have:-(not installed)} -> $new"
-    ( cd "$W/$p" && makepkg -si --noconfirm --needed --skippgpcheck -c -f )
-    built+=("$p")
-done
-echo ":: Done.${built[*]:+ Rebuilt: ${built[*]}}"
+exec pamac upgrade --aur "$@"

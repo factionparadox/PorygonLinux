@@ -1,3 +1,4 @@
 repo/
 aur/
 out/
+.build/

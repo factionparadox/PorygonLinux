@@ -1,6 +1,13 @@
 # --- base system ---
 base
-linux
+linux72
+manjaro-system
+manjaro-release
+manjaro-keyring
+archlinux-keyring
+pacman-mirrors
+mhwd
+mhwd-db
 linux-firmware
 sof-firmware
 alsa-firmware
@@ -90,6 +97,7 @@ libtiff5
 gtk2
 maxx-desktop
 # --- apps ---
+pamac-cli
 firefox
 xpdf
 fastfetch

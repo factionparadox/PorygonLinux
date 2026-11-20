@@ -1,26 +1,25 @@
 #!/bin/bash
-# upgrade - Porygon's package tool (named for the item that evolves Porygon)
+# upgrade - Porygon's package tool (named for the item that evolves Porygon).
+# A thin coat of paint over Manjaro's pamac.
 #   upgrade                 update the system
 #   upgrade install PKG..   install packages
 #   upgrade remove PKG..    remove packages (and their unused deps)
-#   upgrade search TERM     search the repos
+#   upgrade search TERM     search the repos (add --aur to search the AUR too)
 #   upgrade info PKG        details about a package
-#   upgrade list            what's installed
+#   upgrade list            what you've installed
 #   upgrade clean           clear the download cache
+#   upgrade mirrors         pick the fastest Manjaro mirrors
 # For the MaXX desktop and other AUR parts, use: dubious-disc
 cmd=${1:-update}; shift 2>/dev/null
-# a fresh install has no package lists yet: do a full update first
-if [[ $cmd =~ ^(install|in|-i|search|s|-s|info)$ ]] && [ ! -e /var/lib/pacman/sync/core.db ]; then
-    echo ":: First run - updating the system before anything else"; sudo pacman -Syu
-fi
 case $cmd in
-  update|-u)      sudo pacman -Syu ;;
-  install|in|-i)  sudo pacman -S --needed "$@" ;;
-  remove|rm|-r)   sudo pacman -Rns "$@" ;;
-  search|s|-s)    pacman -Ss "$@" ;;
-  info)           pacman -Si "$@" 2>/dev/null || pacman -Qi "$@" ;;
-  list|ls)        pacman -Qe ;;
-  clean)          sudo pacman -Sc ;;
-  help|-h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//' ;;
+  update|-u)      pamac upgrade ;;
+  install|in|-i)  pamac install "$@" ;;
+  remove|rm|-r)   pamac remove -o "$@" ;;
+  search|s|-s)    if [ "${1:-}" = --aur ]; then shift; pamac search -a "$@"; else pamac search "$@"; fi ;;
+  info)           pamac info "$@" ;;
+  list|ls)        pamac list -e ;;
+  clean)          pamac clean ;;
+  mirrors)        sudo pacman-mirrors --fasttrack 10 && sudo pacman -Syy ;;
+  help|-h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) echo "upgrade: unknown command '$cmd' (try: upgrade help)"; exit 1 ;;
 esac

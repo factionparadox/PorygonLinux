@@ -10,7 +10,8 @@ die() { printf '\e[1;31m!!\e[0m %s\n' "$*"; exit 1; }
 
 [ -d /sys/firmware/efi ] || die "Porygon installs in UEFI mode only. Reboot the USB in UEFI mode."
 BOOTMNT=/run/archiso/bootmnt/porygon/boot/x86_64
-[ -f $BOOTMNT/vmlinuz-linux ] || die "Can't find the live kernel at $BOOTMNT - run this from the Porygon live USB."
+KVER=7.2-x86_64
+[ -f $BOOTMNT/vmlinuz-$KVER ] || die "Can't find the live kernel at $BOOTMNT - run this from the Porygon live USB."
 
 clear
 printf "${B}PORYGON INSTALLER${N}\n\n"
@@ -68,7 +69,9 @@ say "Copying the system (a few minutes)"
 rsync -aAXH --info=progress2 --no-inc-recursive \
     --exclude={/dev/*,/proc/*,/sys/*,/run/*,/tmp/*,/mnt/*,/boot/*,/home/porygon,/var/cache/pacman/pkg/*,/var/log/journal/*,/etc/machine-id,/etc/pacman.d/gnupg/*} \
     / /mnt/
-cp $BOOTMNT/vmlinuz-linux /mnt/boot/
+cp $BOOTMNT/vmlinuz-$KVER /mnt/boot/
+# Manjaro keeps the kernel version in this file; mkinitcpio needs it
+[ -f /mnt/boot/linux72-x86_64.kver ] || ls /mnt/usr/lib/modules | grep -m1 MANJARO > /mnt/boot/linux72-x86_64.kver
 for u in intel-ucode amd-ucode; do
     [ -f /run/archiso/bootmnt/porygon/boot/$u.img ] && cp /run/archiso/bootmnt/porygon/boot/$u.img /mnt/boot/
 done
@@ -77,23 +80,23 @@ done
 say "Configuring"
 rm -f /mnt/etc/mkinitcpio.conf.d/archiso.conf \
       /mnt/etc/systemd/system/getty@tty1.service.d/autologin.conf \
-      /mnt/etc/systemd/system/{choose-mirror,pacman-init,livecd-alsa-unmuter,etc-pacman.d-gnupg.mount}.service \
+      /mnt/etc/systemd/system/{pacman-init,livecd-alsa-unmuter}.service \
       /mnt/etc/systemd/system/etc-pacman.d-gnupg.mount \
-      /mnt/etc/systemd/system/multi-user.target.wants/{choose-mirror,pacman-init}.service \
+      /mnt/etc/systemd/system/multi-user.target.wants/pacman-init.service \
       /mnt/etc/systemd/system/sound.target.wants/livecd-alsa-unmuter.service \
       /mnt/etc/systemd/journald.conf.d/volatile-storage.conf \
       /mnt/etc/systemd/logind.conf.d/do-not-suspend.conf \
-      /mnt/etc/pacman.d/hooks/{uncomment-mirrors,zzzz99-remove-custom-hooks-from-airootfs}.hook \
+      /mnt/etc/pacman.d/hooks/zzzz99-remove-custom-hooks-from-airootfs.hook \
       /mnt/etc/sudoers.d/porygon \
       /mnt/etc/tmpfiles.d/porygon-live.conf \
-      /mnt/usr/local/bin/{choose-mirror,livecd-sound,porygon-install}
+      /mnt/usr/local/bin/{livecd-sound,porygon-install}
 rm -rf /mnt/usr/local/share/livecd-sound
 sed -i '/^porygon:/d' /mnt/etc/passwd /mnt/etc/shadow
 sed -i '/^porygon:/d' /mnt/etc/group /mnt/etc/gshadow
 sed -i 's/,porygon//; s/:porygon$/:/' /mnt/etc/group /mnt/etc/gshadow
 genfstab -U /mnt > /mnt/etc/fstab
 echo "$HOST" > /mnt/etc/hostname
-printf '\n  PORYGON  -  a 1990s workstation, rendered in polygons\n  upgrade: update the system    dubious-disc: update MaXX too\n\n' > /mnt/etc/motd
+printf '\n  PORYGON  -  a 1990s workstation, rendered in polygons\n  upgrade: update the system    dubious-disc: update MaXX too\n  Manjaro edition: aged two weeks, like a fine cheese\n\n' > /mnt/etc/motd
 ln -sf "/usr/share/zoneinfo/$TZONE" /mnt/etc/localtime
 echo "KEYMAP=$KB" > /mnt/etc/vconsole.conf
 echo "LANG=en_GB.UTF-8" > /mnt/etc/locale.conf
@@ -118,7 +121,7 @@ systemd-machine-id-setup >/dev/null 2>&1
 locale-gen >/dev/null
 hwclock --systohc || true
 pacman-key --init >/dev/null 2>&1
-pacman-key --populate archlinux >/dev/null 2>&1
+pacman-key --populate manjaro archlinux >/dev/null 2>&1
 useradd -m -G wheel,video,audio,input -s /bin/bash "$USERNAME"
 echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/10-wheel
 chmod 440 /etc/sudoers.d/10-wheel
@@ -139,8 +142,8 @@ editor no
 LDR
 cat > /mnt/boot/loader/entries/porygon.conf <<ENT
 title   Porygon
-linux   /vmlinuz-linux
-${UC}initrd  /initramfs-linux.img
+linux   /vmlinuz-$KVER
+${UC}initrd  /initramfs-$KVER.img
 options root=UUID=$UUID rw quiet
 ENT
 
