@@ -3,7 +3,7 @@
 
 iso_name="porygon"
 iso_label="PORYGON_$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m)"
-iso_publisher="Porygon <https://github.com/factionparadox/porygon>"
+iso_publisher="Porygon <https://github.com/factionparadox/PorygonLinux>"
 iso_application="Porygon Live/Install medium"
 iso_version="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)"
 install_dir="porygon"

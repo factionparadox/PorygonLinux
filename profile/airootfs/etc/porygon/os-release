@@ -4,5 +4,5 @@ ID=porygon
 ID_LIKE="manjaro arch"
 BUILD_ID=rolling
 ANSI_COLOR="38;2;70;110;160"
-HOME_URL="https://github.com/factionparadox/porygon"
+HOME_URL="https://github.com/factionparadox/PorygonLinux"
 LOGO=porygon
