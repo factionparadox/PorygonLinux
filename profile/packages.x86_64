@@ -1,0 +1,96 @@
+# --- base system ---
+base
+linux
+linux-firmware
+sof-firmware
+alsa-firmware
+intel-ucode
+amd-ucode
+mkinitcpio
+mkinitcpio-archiso
+syslinux
+efibootmgr
+edk2-shell
+memtest86+
+memtest86+-efi
+sudo
+man-db
+man-pages
+nano
+vim
+less
+bash-completion
+terminus-font
+# --- install tools ---
+arch-install-scripts
+rsync
+gptfdisk
+parted
+dosfstools
+xfsprogs
+e2fsprogs
+btrfs-progs
+ntfs-3g
+exfatprogs
+cryptsetup
+# --- networking ---
+networkmanager
+wireless-regdb
+openssh
+# --- laptop ---
+power-profiles-daemon
+thermald
+brightnessctl
+acpi
+# --- sound ---
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+alsa-utils
+pamixer
+pavucontrol
+livecd-sounds
+# --- X11 ---
+xorg-server
+xorg-xinit
+xorg-xrdb
+xorg-xsetroot
+xorg-xset
+xorg-xrandr
+xorg-xdpyinfo
+xorg-xprop
+xorg-xkill
+xf86-input-libinput
+mesa
+vulkan-intel
+intel-media-driver
+xterm
+xbindkeys
+# --- MaXX runtime (from its AUR PKGBUILD) ---
+openmotif
+libxp
+libxml2-legacy
+libxcrypt-compat
+libid3tag
+imlib2
+glew
+freeglut
+glu
+noto-fonts
+noto-fonts-extra
+ttf-dejavu
+xorg-fonts-100dpi
+xorg-fonts-75dpi
+# --- [porygon] repo: built from the AUR by build/aur.sh ---
+ncurses5-compat-libs
+libjpeg6-turbo
+libpng15
+libtiff5
+gtk2
+maxx-desktop
+# --- apps ---
+firefox
+xpdf
+fastfetch
+git

@@ -1,0 +1,26 @@
+#!/bin/bash
+# upgrade - Porygon's package tool (named for the item that evolves Porygon)
+#   upgrade                 update the system
+#   upgrade install PKG..   install packages
+#   upgrade remove PKG..    remove packages (and their unused deps)
+#   upgrade search TERM     search the repos
+#   upgrade info PKG        details about a package
+#   upgrade list            what's installed
+#   upgrade clean           clear the download cache
+# For the MaXX desktop and other AUR parts, use: dubious-disc
+cmd=${1:-update}; shift 2>/dev/null
+# a fresh install has no package lists yet: do a full update first
+if [[ $cmd =~ ^(install|in|-i|search|s|-s|info)$ ]] && [ ! -e /var/lib/pacman/sync/core.db ]; then
+    echo ":: First run - updating the system before anything else"; sudo pacman -Syu
+fi
+case $cmd in
+  update|-u)      sudo pacman -Syu ;;
+  install|in|-i)  sudo pacman -S --needed "$@" ;;
+  remove|rm|-r)   sudo pacman -Rns "$@" ;;
+  search|s|-s)    pacman -Ss "$@" ;;
+  info)           pacman -Si "$@" 2>/dev/null || pacman -Qi "$@" ;;
+  list|ls)        pacman -Qe ;;
+  clean)          sudo pacman -Sc ;;
+  help|-h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) echo "upgrade: unknown command '$cmd' (try: upgrade help)"; exit 1 ;;
+esac

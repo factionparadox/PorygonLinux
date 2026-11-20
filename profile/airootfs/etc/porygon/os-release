@@ -1,0 +1,8 @@
+NAME="Porygon"
+PRETTY_NAME="Porygon"
+ID=porygon
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;70;110;160"
+HOME_URL="https://github.com/factionparadox/porygon"
+LOGO=porygon

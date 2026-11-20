@@ -1,0 +1,11 @@
+# Keep Porygon's identity when the 'filesystem' package installs or updates
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+
+[Action]
+Description = Setting Porygon os-release...
+When = PostTransaction
+Exec = /usr/bin/cp /etc/porygon/os-release /usr/lib/os-release

@@ -1,0 +1,6 @@
+root:x:0:root
+wheel:x:998:porygon
+video:x:985:porygon
+audio:x:995:porygon
+input:x:994:porygon
+porygon:x:1000:

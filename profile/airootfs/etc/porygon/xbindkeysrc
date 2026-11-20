@@ -1,0 +1,12 @@
+"brightnessctl -q set +5%"
+    XF86MonBrightnessUp
+"brightnessctl -q set 5%-"
+    XF86MonBrightnessDown
+"pamixer -i 5"
+    XF86AudioRaiseVolume
+"pamixer -d 5"
+    XF86AudioLowerVolume
+"pamixer -t"
+    XF86AudioMute
+"pamixer --default-source -t"
+    XF86AudioMicMute

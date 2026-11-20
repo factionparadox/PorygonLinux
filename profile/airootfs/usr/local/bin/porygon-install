@@ -1,0 +1,149 @@
+#!/bin/bash
+# porygon-install - copies the running live system onto a disk.
+# Wipes the chosen disk: 1 GiB EFI partition + XFS root (XFS, as on IRIX).
+set -euo pipefail
+[ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+
+B='\e[1;38;2;120;160;210m'; N='\e[0m'
+say() { printf "${B}::${N} %s\n" "$*"; }
+die() { printf '\e[1;31m!!\e[0m %s\n' "$*"; exit 1; }
+
+[ -d /sys/firmware/efi ] || die "Porygon installs in UEFI mode only. Reboot the USB in UEFI mode."
+BOOTMNT=/run/archiso/bootmnt/porygon/boot/x86_64
+[ -f $BOOTMNT/vmlinuz-linux ] || die "Can't find the live kernel at $BOOTMNT - run this from the Porygon live USB."
+
+clear
+printf "${B}PORYGON INSTALLER${N}\n\n"
+
+# --- disk, picked by number ---
+live_disk=$(lsblk -no PKNAME "$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null)" 2>/dev/null || true)
+mapfile -t disks < <(lsblk -dpno NAME,TYPE,RM | awk '$2=="disk"{print $1}' | grep -v -e '/dev/loop' -e '/dev/zram' ${live_disk:+-e "/dev/$live_disk\$"})
+[ ${#disks[@]} -gt 0 ] || die "No disks found to install to."
+say "Disks:"
+for i in "${!disks[@]}"; do
+    d=${disks[$i]}
+    printf "   %d) %-14s %8s  %s\n" $((i+1)) "$d" "$(lsblk -dno SIZE "$d" | xargs)" "$(lsblk -dno MODEL "$d" | xargs)"
+done
+read -rp "   Install to disk number: " n
+[[ $n =~ ^[0-9]+$ ]] && (( n >= 1 && n <= ${#disks[@]} )) || die "Not a disk number."
+DISK=${disks[$((n-1))]}
+
+# --- user ---
+echo
+read -rp "   Your username: " USERNAME
+[[ $USERNAME =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "Usernames are lowercase letters, numbers, - and _."
+while :; do
+    read -rsp "   Password: " PW1; echo
+    read -rsp "   Password again: " PW2; echo
+    [ -n "$PW1" ] && [ "$PW1" = "$PW2" ] && break
+    echo "   Those didn't match (or were empty) - try again."
+done
+read -rp "   Computer name [porygon]: " HOST; HOST=${HOST:-porygon}
+TZ_DEFAULT=$(readlink /etc/localtime | sed 's|.*/zoneinfo/||'); [ "$TZ_DEFAULT" = UTC ] && TZ_DEFAULT=Europe/London
+read -rp "   Time zone [$TZ_DEFAULT]: " TZONE; TZONE=${TZONE:-$TZ_DEFAULT}
+[ -f "/usr/share/zoneinfo/$TZONE" ] || die "Unknown time zone '$TZONE'."
+read -rp "   Keyboard layout [gb]: " KB; KB=${KB:-gb}
+
+echo
+printf '\e[1;31m   EVERYTHING on %s (%s) will be erased.\e[0m\n' "$DISK" "$(lsblk -dno SIZE "$DISK" | xargs)"
+read -rp "   Type yes to continue: " ok
+[ "$ok" = yes ] || die "Cancelled - nothing was changed."
+
+# --- partition ---
+say "Partitioning $DISK"
+umount -R /mnt 2>/dev/null || true
+wipefs -af "$DISK" >/dev/null
+sgdisk -Z "$DISK" >/dev/null
+sgdisk -n1:0:+1G -t1:ef00 -c1:EFI -n2:0:0 -t2:8304 -c2:porygon "$DISK" >/dev/null
+partprobe "$DISK"; udevadm settle
+part() { lsblk -lpno NAME "$DISK" | sed -n "$(( $1 + 1 ))p"; }
+ESP=$(part 1); ROOT=$(part 2)
+mkfs.fat -F32 -n EFI "$ESP" >/dev/null
+mkfs.xfs -f -L porygon "$ROOT" >/dev/null
+mount "$ROOT" /mnt
+mount --mkdir -o umask=0077 "$ESP" /mnt/boot
+
+# --- copy the live system ---
+say "Copying the system (a few minutes)"
+rsync -aAXH --info=progress2 --no-inc-recursive \
+    --exclude={/dev/*,/proc/*,/sys/*,/run/*,/tmp/*,/mnt/*,/boot/*,/home/porygon,/var/cache/pacman/pkg/*,/var/log/journal/*,/etc/machine-id,/etc/pacman.d/gnupg/*} \
+    / /mnt/
+cp $BOOTMNT/vmlinuz-linux /mnt/boot/
+for u in intel-ucode amd-ucode; do
+    [ -f /run/archiso/bootmnt/porygon/boot/$u.img ] && cp /run/archiso/bootmnt/porygon/boot/$u.img /mnt/boot/
+done
+
+# --- undo the live-USB bits ---
+say "Configuring"
+rm -f /mnt/etc/mkinitcpio.conf.d/archiso.conf \
+      /mnt/etc/systemd/system/getty@tty1.service.d/autologin.conf \
+      /mnt/etc/systemd/system/{choose-mirror,pacman-init,livecd-alsa-unmuter,etc-pacman.d-gnupg.mount}.service \
+      /mnt/etc/systemd/system/etc-pacman.d-gnupg.mount \
+      /mnt/etc/systemd/system/multi-user.target.wants/{choose-mirror,pacman-init}.service \
+      /mnt/etc/systemd/system/sound.target.wants/livecd-alsa-unmuter.service \
+      /mnt/etc/systemd/journald.conf.d/volatile-storage.conf \
+      /mnt/etc/systemd/logind.conf.d/do-not-suspend.conf \
+      /mnt/etc/pacman.d/hooks/{uncomment-mirrors,zzzz99-remove-custom-hooks-from-airootfs}.hook \
+      /mnt/etc/sudoers.d/porygon \
+      /mnt/etc/tmpfiles.d/porygon-live.conf \
+      /mnt/usr/local/bin/{choose-mirror,livecd-sound,porygon-install}
+rm -rf /mnt/usr/local/share/livecd-sound
+sed -i '/^porygon:/d' /mnt/etc/passwd /mnt/etc/shadow
+sed -i '/^porygon:/d' /mnt/etc/group /mnt/etc/gshadow
+sed -i 's/,porygon//; s/:porygon$/:/' /mnt/etc/group /mnt/etc/gshadow
+genfstab -U /mnt > /mnt/etc/fstab
+echo "$HOST" > /mnt/etc/hostname
+printf '\n  PORYGON  -  a 1990s workstation, rendered in polygons\n  upgrade: update the system    dubious-disc: update MaXX too\n\n' > /mnt/etc/motd
+ln -sf "/usr/share/zoneinfo/$TZONE" /mnt/etc/localtime
+echo "KEYMAP=$KB" > /mnt/etc/vconsole.conf
+echo "LANG=en_GB.UTF-8" > /mnt/etc/locale.conf
+sed -i 's/^#\(en_GB.UTF-8\)/\1/; s/^#\(en_US.UTF-8\)/\1/' /mnt/etc/locale.gen
+mkdir -p /mnt/etc/X11/xorg.conf.d
+cat > /mnt/etc/X11/xorg.conf.d/00-keyboard.conf <<KBD
+Section "InputClass"
+    Identifier "keyboard"
+    MatchIsKeyboard "on"
+    Option "XkbLayout" "$KB"
+EndSection
+KBD
+mkdir -p /mnt/etc/systemd/system/getty@tty1.service.d
+cat > /mnt/etc/systemd/system/getty@tty1.service.d/autologin.conf <<AUTO
+[Service]
+ExecStart=
+ExecStart=-/usr/bin/agetty --noreset --noclear --autologin $USERNAME - \${TERM}
+AUTO
+
+arch-chroot /mnt /bin/bash -e <<CHROOT
+systemd-machine-id-setup >/dev/null 2>&1
+locale-gen >/dev/null
+hwclock --systohc || true
+pacman-key --init >/dev/null 2>&1
+pacman-key --populate archlinux >/dev/null 2>&1
+useradd -m -G wheel,video,audio,input -s /bin/bash "$USERNAME"
+echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/10-wheel
+chmod 440 /etc/sudoers.d/10-wheel
+passwd -l root >/dev/null
+mkinitcpio -P >/dev/null 2>&1 || mkinitcpio -P
+CHROOT
+printf '%s:%s\n' "$USERNAME" "$PW1" | arch-chroot /mnt chpasswd
+# run from the live system (not the chroot) so the firmware boot entry gets written too
+bootctl --esp-path=/mnt/boot --graceful install >/dev/null 2>&1 || die "Couldn't install the bootloader."
+
+UUID=$(blkid -s UUID -o value "$ROOT")
+UC=""
+for u in intel-ucode amd-ucode; do [ -f /mnt/boot/$u.img ] && UC+="initrd  /$u.img"$'\n'; done
+cat > /mnt/boot/loader/loader.conf <<LDR
+default porygon.conf
+timeout 2
+editor no
+LDR
+cat > /mnt/boot/loader/entries/porygon.conf <<ENT
+title   Porygon
+linux   /vmlinuz-linux
+${UC}initrd  /initramfs-linux.img
+options root=UUID=$UUID rw quiet
+ENT
+
+sync
+umount -R /mnt
+say "Done. Remove the USB and reboot - you'll land straight in the desktop."
