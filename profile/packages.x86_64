@@ -1,5 +1,10 @@
 # --- base system ---
 base
+# liberated systemd (AUR, built into [porygon]); provides systemd,
+# systemd-libs and systemd-sysvcompat so base and everything else is happy
+systemd-liberated-git
+systemd-liberated-libs-git
+systemd-liberated-sysvcompat-git
 linux72
 manjaro-system
 manjaro-release

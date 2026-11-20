@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 TOP=$PWD
 CONF=$1                       # rendered Manjaro pacman.conf from build.sh
 MIRROR=$2
-PKGS=(ncurses5-compat-libs libjpeg6-turbo libpng15 libtiff5 gtk2 maxx-desktop)
+PKGS=(ncurses5-compat-libs libjpeg6-turbo libpng15 libtiff5 gtk2 maxx-desktop systemd-liberated-git)
 CH=$TOP/.build/chroot
 mkdir -p repo aur .build
 
@@ -15,7 +15,11 @@ todo=()
 for p in "${PKGS[@]}"; do
     if [ -d "aur/$p" ]; then git -C "aur/$p" pull -q; else git clone -q "https://aur.archlinux.org/$p.git" "aur/$p"; fi
     ver=$(grep -E '^(pkgver|pkgrel)=' "aur/$p/PKGBUILD" | cut -d= -f2 | paste -sd-)
-    if ls repo/"$p-$ver"-*.pkg.tar.* >/dev/null 2>&1; then echo "==> $p $ver already built"; else todo+=("$p"); fi
+    if [[ $p == *-git ]]; then
+        # -git packages get their version from the newest commit, so any
+        # build counts; delete it from repo/ (or run dubious-disc) to refresh
+        if ls repo/"$p"-[0-9]*.pkg.tar.* >/dev/null 2>&1; then echo "==> $p already built"; else todo+=("$p"); fi
+    elif ls repo/"$p-$ver"-*.pkg.tar.* >/dev/null 2>&1; then echo "==> $p $ver already built"; else todo+=("$p"); fi
 done
 
 if [ ${#todo[@]} -gt 0 ]; then
@@ -39,8 +43,10 @@ if [ ${#todo[@]} -gt 0 ]; then
     for p in "${todo[@]}"; do
         echo "==> building $p in Manjaro"
         rm -rf "$CH/build/$p"; cp -r "aur/$p" "$CH/build/$p"
+        # Porygon's own fix-ups for AUR packages that need one (build/fix-NAME.sh)
+        [ -f "build/fix-$p.sh" ] && (cd "$CH/build/$p" && sh "$TOP/build/fix-$p.sh")
         chown -R 1000:1000 "$CH/build"
-        flags="-s --noconfirm --needed --skippgpcheck -c -f"
+        flags="-s --noconfirm --needed --skippgpcheck --nocheck -c -f"
         # maxx-desktop only unpacks a tarball, so its runtime deps aren't needed to package it
         [ "$p" = maxx-desktop ] && flags="-d --noconfirm -c -f"
         arch-chroot "$CH" runuser -u builder -- env https_proxy="${https_proxy:-}" HTTPS_PROXY="${HTTPS_PROXY:-}" \

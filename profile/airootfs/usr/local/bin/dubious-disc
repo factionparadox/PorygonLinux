@@ -1,7 +1,8 @@
 #!/bin/bash
 # dubious-disc - full evolution: updates the system, then rebuilds Porygon's
 # AUR packages (the MaXX desktop, gtk2 and the old libraries it needs) when
-# the AUR has newer versions. Manjaro's pamac does the work.
+# the AUR has newer versions - including liberated systemd, rebuilt from
+# its newest commit (that one takes a while). Manjaro's pamac does the work.
 [ "$(id -u)" = 0 ] && { echo "Run dubious-disc as your normal user, not root."; exit 1; }
 start=$(date +%Y-%m-%dT%H:%M:%S)
-pamac upgrade --aur "$@" && porygon-record-evolution dubious-disc "$start"
+pamac upgrade --aur --devel "$@" && porygon-record-evolution dubious-disc "$start"

@@ -7,6 +7,11 @@ recreation of IRIX's Indigo Magic desktop) on X11.
 - **Base:** Manjaro stable (yes, really), `linux72` kernel, pamac. MaXX's own
   install guide is written for Manjaro, so this is the officially blessed way to be wrong.
   The plain-Arch version lives on the `arch` branch.
+- **systemd:** the liberated fork from the AUR (`systemd-liberated-git`),
+  which removes the `birthDate` field from user records. It's built from the
+  fork's newest commit (unreleased systemd 263), so it runs ahead of the rest
+  of Manjaro stable (261). `build/fix-systemd-liberated-git.sh` patches the AUR
+  recipe to build on Manjaro (Rust, bindgen and Manjaro's kernel headers).
 - **Desktop:** MaXX Interactive Desktop 2.2.0 (5Dwm, Toolchest, ROX desktop)
   started straight from tty1, no login screen
 - **Root filesystem:** XFS, as on IRIX
@@ -65,9 +70,10 @@ inside a clean Manjaro chroot (`gtk2` takes the longest); later builds reuse the
 | Command | Does |
 |---|---|
 | `upgrade` | update the system (via pamac) |
-| `upgrade install PKG` / `remove PKG` / `search TERM` / `info PKG` / `list` / `clean` | the usual |
+| `upgrade install PKG` | install; when Manjaro and the AUR both have it, pick the source by number |
+| `upgrade remove PKG` / `search TERM` / `info PKG` / `list` / `clean` | the usual |
 | `upgrade mirrors` | pick the fastest Manjaro mirrors |
-| `dubious-disc` | full evolution: system update, then rebuilds MaXX and the other AUR parts if there are newer versions (`pamac upgrade --aur`) |
+| `dubious-disc` | full evolution: system update, then rebuilds MaXX and the other AUR parts if there are newer versions (`pamac upgrade --aur --devel`, so it also rebuilds liberated systemd from its newest commit - slow) |
 
 ## Licences
 

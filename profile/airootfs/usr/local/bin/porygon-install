@@ -61,8 +61,12 @@ part() { lsblk -lpno NAME "$DISK" | sed -n "$(( $1 + 1 ))p"; }
 ESP=$(part 1); ROOT=$(part 2)
 mkfs.fat -F32 -n EFI "$ESP" >/dev/null
 mkfs.xfs -f -L porygon "$ROOT" >/dev/null
-mount "$ROOT" /mnt
-mount --mkdir -o umask=0077 "$ESP" /mnt/boot
+# name the filesystems outright: on a fresh partition, mount's own type
+# detection can miss (it tried squashfs on XFS during testing)
+modprobe -q xfs || true
+udevadm settle
+mount -t xfs "$ROOT" /mnt
+mount --mkdir -t vfat -o umask=0077 "$ESP" /mnt/boot
 
 # --- copy the live system ---
 say "Copying the system (a few minutes)"
