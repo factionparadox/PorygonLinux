@@ -6,7 +6,6 @@ recreation of IRIX's Indigo Magic desktop) on X11.
 
 - **Base:** Manjaro stable (yes, really), `linux72` kernel, pamac. MaXX's own
   install guide is written for Manjaro, so this is the officially blessed way to be wrong.
-  The plain-Arch version lives on the `arch` branch.
 - **systemd:** the liberated fork from the AUR (`systemd-liberated-git`),
   which removes the `birthDate` field from user records. It's built from the
   fork's newest commit (unreleased systemd 263), so it runs ahead of the rest
@@ -77,8 +76,12 @@ inside a clean Manjaro chroot (`gtk2` takes the longest); later builds reuse the
 
 ## Licences
 
-Porygon's own scripts are yours to do what you like with. The MaXX Interactive
-Desktop is © Eric Masson and is used under its own licence
-(`/opt/MaXX/doc/LICENSE`); the build fetches it unmodified from its official
-source via the AUR. Porygon isn't endorsed by MaXX Interactive, SGI,
-Manjaro or Nintendo; the name is a fan tribute.
+| Part | Licence |
+|---|---|
+| Porygon's own files (scripts, build profile, `art/`) | not chosen yet |
+| MaXX Interactive Desktop | MaXX's own licence, © Eric Masson: the older code may be redistributed only as unmodified binaries; newer code is BSD-3-Clause. Full text in `/opt/MaXX/doc/LICENSE` |
+| systemd (liberated fork) | LGPL-2.1-or-later, with some GPL-2.0-or-later parts |
+| Everything else from Manjaro | each package's own licence, in `/usr/share/licenses` |
+
+"Porygon" is a Pokémon name owned by Nintendo, Creatures and Game Freak.
+This is an unofficial fan project.
