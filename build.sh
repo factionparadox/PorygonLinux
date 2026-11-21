@@ -6,7 +6,17 @@ set -euo pipefail
 TOP=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
 cd "$TOP"
 MIRROR=${MIRROR:-https://mirror.init7.net/manjaro}
-[ "$(id -u)" = 0 ] || exec sudo MIRROR="$MIRROR" bash "$TOP/build.sh" "$@"
+if [ "$(id -u)" != 0 ]; then
+    # WSL sometimes starts without terminal devices (/dev/pts), and sudo
+    # then refuses to run ("unable to allocate pty"). Say how to get past it.
+    if ! ls /dev/pts/[0-9]* >/dev/null 2>&1; then
+        echo "WSL started without its terminal devices, so sudo won't run."
+        echo "In PowerShell, either restart WSL:   wsl --shutdown"
+        echo "or build as root:  wsl -d archlinux -u root bash $TOP/build.sh"
+        exit 1
+    fi
+    exec sudo MIRROR="$MIRROR" bash "$TOP/build.sh" "$@"
+fi
 # All the build's working files live on the Linux side: a Windows drive
 # (/mnt/c...) can't hold the temporary Linux system the build makes.
 B=/var/tmp/porygon-build
