@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+"""Known issues for the coming Manjaro stable update.
+
+Reads the newest stable-update announcement on forum.manjaro.org and prints the
+"Known issues and solutions" entries dated after your last full upgrade. An
+entry that names a package you have installed is marked. Exit status: 0 when
+there is nothing new, 1 when there are entries to read, 2 when the forum
+couldn't be reached (the update can go ahead either way).
+"""
+import datetime, html, json, re, subprocess, sys, textwrap, urllib.request
+
+FORUM = "https://forum.manjaro.org"
+PINK, BLUE, RED, DIM, N = "\033[1;38;2;236;132;157m", "\033[1;38;2;120;160;210m", "\033[1;31m", "\033[2m", "\033[0m"
+if not sys.stdout.isatty():
+    PINK = BLUE = RED = DIM = N = ""
+
+
+def get(path):
+    req = urllib.request.Request(FORUM + path, headers={"User-Agent": "porygon-upgrade"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.load(r)
+
+
+def last_upgrade():
+    """Date of the last full system upgrade, from pacman's log."""
+    day = None
+    try:
+        for line in open("/var/log/pacman.log", errors="replace"):
+            if "starting full system upgrade" in line:
+                day = line[1:11]
+    except OSError:
+        pass
+    return day or "1970-01-01"
+
+
+def text(fragment):
+    fragment = re.sub(r"<br\s*/?>\s*", " ", fragment)
+    fragment = re.sub(r"</p>|</li>|</pre>", "\n", fragment)
+    fragment = re.sub(r"<[^>]+>", "", fragment)
+    return html.unescape(fragment).strip()
+
+
+def main():
+    try:
+        topics = get("/c/announcements/stable-updates/12.json")["topic_list"]["topics"]
+        topic = next(t for t in topics if t["slug"].startswith("stable-update-"))
+        posts = get(f"/t/{topic['id']}.json")["post_stream"]["posts"]
+    except Exception:
+        return 2
+    cooked = next((p["cooked"] for p in posts[:3] if "known-issues" in p["cooked"]), "")
+    since = last_upgrade()
+    installed = set(subprocess.run(["pacman", "-Qq"], capture_output=True, text=True).stdout.split())
+
+    entries = []
+    for head, body in re.findall(r"<h2>(.*?)</h2>(.*?)(?=<h2>|\Z)", cooked, re.S):
+        m = re.search(r"(\d{4}-\d{2}-\d{2})", text(head))
+        if not m or m.group(1) <= since:
+            continue
+        for summary, detail in re.findall(r"<summary>(.*?)</summary>(.*?)</details>", body, re.S):
+            names = set(re.findall(r"<code>([a-z0-9@._+-]+)</code>", detail)) & installed
+            entries.append((m.group(1), text(summary), text(detail), sorted(names)))
+    if not entries:
+        return 0
+
+    print(f"{BLUE}::{N} Known issues in this Manjaro update {DIM}({FORUM}/t/{topic['id']}){N}\n")
+    for day, title, detail, names in entries:
+        mark = f"  {RED}affects you: {', '.join(names)}{N}" if names else ""
+        print(f"  {PINK}{title}{N} {DIM}{day}{N}{mark}")
+        for para in detail.split("\n"):
+            if para.strip():
+                print(textwrap.fill(para.strip(), 76, initial_indent="    ", subsequent_indent="    "))
+        print()
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

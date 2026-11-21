@@ -3,9 +3,10 @@
 
 A small, gentle reminder window in the bottom-right corner. Prints the ID of
 the button you press (nothing if you close it or ignore it). It never grabs
-the keyboard and it closes itself after three minutes.
+the keyboard and it closes itself after three minutes
+(PORYGON_NUDGE_STAY=1 keeps it until answered).
 """
-import sys, tkinter as tk
+import os, sys, tkinter as tk
 BG, PANEL, FIELD, PINK, INK = "#d9d3dd", "#c3bccb", "#f0c4d0", "#ec849d", "#1a1020"
 title, body, acts = sys.argv[1], sys.argv[2], [a.split("=", 1) for a in sys.argv[3:]]
 r = tk.Tk(); r.title("Porygon"); r.configure(bg=BG); r.resizable(False, False)
@@ -29,5 +30,6 @@ for i, label in reversed(acts):
 r.update_idletasks()
 w, h = r.winfo_width(), r.winfo_height()
 r.geometry(f"+{r.winfo_screenwidth() - w - 24}+{r.winfo_screenheight() - h - 48}")
-r.after(180000, r.destroy)
+if not os.environ.get("PORYGON_NUDGE_STAY"):
+    r.after(180000, r.destroy)
 r.mainloop()

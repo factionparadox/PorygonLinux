@@ -1,0 +1,9 @@
+#!/bin/bash
+# Run at login: if this boot came from a snapshot, offer to keep it.
+grep -q '/\.snapshots/' /proc/cmdline || exit 0
+n=$(sed -n 's|.*/\.snapshots/\([0-9]*\)/snapshot.*|\1|p' /proc/cmdline)
+when=$(sudo -n snapper -c root list --columns number,date 2>/dev/null | awk -v n="$n" '$1 == n { $1=""; $2=""; print }' | xargs)
+choice=$(PORYGON_NUDGE_STAY=1 porygon-nudge "Running a snapshot" \
+    "This is snapshot $n${when:+ from $when}. Changes made now disappear at the next restart unless you keep it." \
+    keep="Keep this one" later="Not now")
+[ "$choice" = keep ] && exec /opt/MaXX/bin/winterm bash -c 'porygon-undo; read -n1 -rsp "Press any key to close."'

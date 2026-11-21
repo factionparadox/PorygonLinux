@@ -104,6 +104,9 @@ Menu Porygon
 	separator		f.separator
 	"Upgrade"		f.exec "$W bash -c 'upgrade; echo; read -n1 -rsp \"Press any key to close.\"'"
 	"Dubious Disc"		f.exec "$W bash -c 'dubious-disc; echo; read -n1 -rsp \"Press any key to close.\"'"
+	"Update at Shutdown"	f.exec "$W bash -c 'upgrade later; echo; read -n1 -rsp \"Press any key to close.\"'"
+	"Undo an Update"	f.exec "$W bash -c 'porygon-undo; echo; read -n1 -rsp \"Press any key to close.\"'"
+	"Snapshots"		f.exec "$W bash -c 'sudo btrfs-assistant'"
 	separator		f.separator
 	"Network Setup"		f.exec "$W nmtui"
 MENU

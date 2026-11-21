@@ -1,0 +1,27 @@
+#!/bin/bash
+# porygon-undo (also: upgrade undo) - go back to how the system was before an
+# update. Snapper takes a snapshot before every update; each one is in the
+# boot menu under Snapshots, with the kernel it had. Booting one is safe to
+# try: changes made while it's running vanish at the next restart unless you
+# keep it, which this command then does.
+B='\e[1;38;2;120;160;210m' P='\e[1;38;2;236;132;157m' N='\e[0m'
+
+if grep -q '/\.snapshots/' /proc/cmdline; then
+    n=$(sed -n 's|.*/\.snapshots/\([0-9]*\)/snapshot.*|\1|p' /proc/cmdline)
+    echo -e "${B}::${N} You're running snapshot ${P}$n${N}."
+    echo "   Keeping it makes it your system from now on; the newer state is kept as"
+    echo "   a snapshot of its own, so this can be undone too."
+    exec sudo limine-snapper-restore
+fi
+command -v snapper >/dev/null && [ -d /.snapshots ] ||
+    { echo "Snapshots aren't set up here (they start once Porygon is installed)."; exit 1; }
+
+echo -e "${B}::${N} Snapshots (newest last; \"pre\" ones were taken just before an update):"
+sudo snapper -c root list --columns number,type,date,description 2>/dev/null | tail -n 10
+cat <<TXT
+
+   To go back: restart, open "Snapshots" in the boot menu and pick the one from
+   before the update. Check things work; Porygon will then offer to keep it.
+TXT
+read -rp "   Restart now? [y/N] " a
+[[ ${a,,} == y* ]] && systemctl reboot

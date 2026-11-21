@@ -47,7 +47,7 @@ d.text((48, 160), "Manjaro edition", font=f2, fill=BLUE_LIGHT)
 img.convert("RGB").save(os.path.join(prof, "syslinux/splash.png"))
 
 # --- the backdrop with the logo, at any size (GRUB + Plymouth) ---
-def backdrop(W, H, tagline=True):
+def backdrop(W, H, tagline=True, title=True):
     tmp = f"/tmp/_bd_{W}x{H}.png"
     subprocess.run([sys.executable, os.path.join(here, "wallpaper.py"), tmp, str(W), str(H), "7"], check=True)
     img = Image.open(tmp).convert("RGBA")
@@ -59,8 +59,9 @@ def backdrop(W, H, tagline=True):
     img.alpha_composite(sh); img.alpha_composite(L, (x, y))
     d = ImageDraw.Draw(img)
     big = font("DejaVuSerif-Bold.ttf", int(H * 0.09)); small = font("DejaVuSans-Oblique.ttf", int(H * 0.028))
-    for off, col in ((max(2, H // 300), NIGHT), (0, WHITE)):
-        d.text((int(W * .06) + off, int(H * .12) + off), "PORYGON", font=big, fill=col)
+    if title:
+        for off, col in ((max(2, H // 300), NIGHT), (0, WHITE)):
+            d.text((int(W * .06) + off, int(H * .12) + off), "PORYGON", font=big, fill=col)
     if tagline:
         d.text((int(W * .065), int(H * .24)), "a computer that works for you", font=small, fill=PINK_LIGHT)
     return img
@@ -106,7 +107,36 @@ terminal-font: "Unifont Regular 16"
 }
 """)
 grub_theme(os.path.join(prof, "grub/themes/porygon"))
-grub_theme(os.path.join(prof, "airootfs/usr/share/grub/themes/porygon"))
+
+# Limine (the installed system's boot menu): the backdrop without the title,
+# since Limine prints its branding line and the menu over the left side
+lim = os.path.join(prof, "airootfs/usr/share/porygon/limine")
+os.makedirs(lim, exist_ok=True)
+backdrop(1920, 1200, tagline=False, title=False).convert("RGB").save(os.path.join(lim, "background.png"))
+hexc = lambda c: "%02x%02x%02x" % c
+open(os.path.join(lim, "theme.conf"), "w").write(f"""# Porygon Limine theme (made by art/logo-assets.py); porygon-install puts
+# this at the top of /boot/limine.conf and the picture in /boot/porygon/
+timeout: 5
+# entry 2 = the first kernel inside the Porygon folder (linux72); after that
+# Limine starts whichever entry you picked last time
+default_entry: 2
+remember_last_entry: yes
+wallpaper: boot():/porygon/background.png
+wallpaper_style: stretched
+backdrop: {hexc(NIGHT)}
+interface_branding: PORYGON  -  a 1990s workstation, rendered in polygons
+interface_branding_colour: {hexc(PINK)}
+interface_help_colour: {hexc(BLUE_LIGHT)}
+interface_help_colour_bright: {hexc(WHITE)}
+term_background: b0{hexc(NIGHT)}
+term_foreground: {hexc(PINK_LIGHT)}
+term_foreground_bright: {hexc(WHITE)}
+term_background_bright: {hexc(BLUE_DARK)}
+term_palette: {';'.join(hexc(c) for c in (NIGHT, PINK_DARK, (120, 190, 140), (230, 200, 120), BLUE, PINK, BLUE_LIGHT, GREY))}
+term_palette_bright: {';'.join(hexc(c) for c in (SLATE, PINK, (150, 220, 170), (250, 225, 150), BLUE_LIGHT, PINK_LIGHT, (190, 220, 245), WHITE))}
+term_margin: 96
+term_margin_gradient: 24
+""")
 
 # Plymouth boot splash: backdrop + logo, with a row of dots that fill in
 pt = os.path.join(prof, "airootfs/usr/share/plymouth/themes/porygon")

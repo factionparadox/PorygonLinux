@@ -6,6 +6,16 @@ systemd-liberated-git
 systemd-liberated-libs-git
 systemd-liberated-sysvcompat-git
 linux72
+# Btrfs + Snapper + Limine (limine-mkinitcpio-hook and limine-snapper-sync go
+# onto the installed system only: see porygon-install)
+limine
+snapper
+snap-pac
+btrfs-assistant
+inotify-tools
+libnotify
+linux618
+xxhash
 manjaro-system
 manjaro-release
 manjaro-keyring
@@ -42,7 +52,6 @@ rsync
 gptfdisk
 parted
 dosfstools
-xfsprogs
 e2fsprogs
 btrfs-progs
 ntfs-3g

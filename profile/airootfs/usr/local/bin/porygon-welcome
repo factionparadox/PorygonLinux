@@ -88,12 +88,17 @@ PAGES = [
         "stays there through updates; upgrade branches lists them and moves "
         "them back.",
         "",
-        "  upgrade  —  update the system.",
+        "  upgrade  —  update the system. Manjaro's known issues for the "
+        "update are shown first.",
+        "  upgrade later  —  download now, install when you shut down.",
+        "  upgrade undo  —  every update is snapshotted first; go back to "
+        "before one from the boot menu's Snapshots.",
         "  dubious-disc  —  the full evolution: the system, then the MaXX "
         "desktop and the other AUR parts.",
     ], [("Add/Remove Software", lambda: run("pamac-manager")),
         ("Update System", lambda: term("upgrade")),
-        ("Testing/Unstable Programs", lambda: term("upgrade", "branches")),
+        ("Undo an Update", lambda: term("porygon-undo")),
+        ("Snapshots", lambda: term("sudo", "btrfs-assistant", hold=False)),
         ("What's New", lambda: run("porygon-evolved"))]),
     ("demos", "Demos", "3D Demos", [
         "SGI workstations were the polygon machines of the 1990s, and these "
@@ -161,7 +166,7 @@ PAGES = [
         "Porygon (Manjaro edition)",
         "",
         f"Kernel {kernel()}  •  MaXX Interactive Desktop {maxx_version()}",
-        "Base: Manjaro stable  •  Root filesystem: XFS",
+        "Base: Manjaro stable  •  Root filesystem: Btrfs  •  Boot menu: Limine",
         "",
         "The MaXX Interactive Desktop is © Eric Masson, used under its own "
         "licence. Porygon is a fan project and isn't endorsed by MaXX "

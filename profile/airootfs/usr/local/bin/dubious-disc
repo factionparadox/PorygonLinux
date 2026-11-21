@@ -32,8 +32,9 @@ glitch "Checksum: ????????  -  installing anyway." "$P"
 glitch "New routines found for travelling between dimensions." "$P"
 echo
 
+upgrade known || exit 0
 start=$(date +%Y-%m-%dT%H:%M:%S)
-if pamac upgrade --aur --devel "$@" && upgrade pinned; then
+if pamac upgrade --aur --devel "$@" && upgrade pinned && upgrade check; then
     echo
     glitch "Porygon2 evolved into Porygon-Z!" "$R"
     echo -e "  ${D}The new code runs. Some of it does things nobody wrote it to do.${N}"

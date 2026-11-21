@@ -1,6 +1,8 @@
 #!/bin/bash
 # porygon-install - copies the running live system onto a disk.
-# Wipes the chosen disk: 1 GiB EFI partition + XFS root (XFS, as on IRIX).
+# Wipes the chosen disk: 2 GiB EFI partition (Limine, kernels, a kernel per
+# snapshot) + Btrfs root in subvolumes, with Snapper taking a snapshot before
+# every update and each snapshot bootable from the Limine menu.
 set -euo pipefail
 [ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
 
@@ -9,16 +11,15 @@ say() { printf "${B}::${N} %s\n" "$*"; }
 die() { printf '\e[1;31m!!\e[0m %s\n' "$*"; exit 1; }
 
 [ -d /sys/firmware/efi ] || die "Porygon installs in UEFI mode only. Reboot the USB in UEFI mode."
-BOOTMNT=/run/archiso/bootmnt/porygon/boot/x86_64
-KVER=7.2-x86_64
-[ -f $BOOTMNT/vmlinuz-$KVER ] || die "Can't find the live kernel at $BOOTMNT - run this from the Porygon live USB."
+[ -d /run/archiso ] || die "Run this from the Porygon live USB."
+PKGS=/usr/share/porygon/pkgs        # the boot tools, installed only on the target
 
 clear
 printf "${B}PORYGON INSTALLER${N}\n\n"
 
 # --- disk, picked by number ---
 live_disk=$(lsblk -no PKNAME "$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null)" 2>/dev/null || true)
-mapfile -t disks < <(lsblk -dpno NAME,TYPE,RM | awk '$2=="disk"{print $1}' | grep -v -e '/dev/loop' -e '/dev/zram' ${live_disk:+-e "/dev/$live_disk\$"})
+mapfile -t disks < <(lsblk -dpno NAME,TYPE,RM | awk '$2=="disk"{print $1}' | grep -v -e '/dev/loop' -e '/dev/zram' -e '/dev/fd' ${live_disk:+-e "/dev/$live_disk\$"})
 [ ${#disks[@]} -gt 0 ] || die "No disks found to install to."
 say "Disks:"
 for i in "${!disks[@]}"; do
@@ -55,30 +56,31 @@ say "Partitioning $DISK"
 umount -R /mnt 2>/dev/null || true
 wipefs -af "$DISK" >/dev/null
 sgdisk -Z "$DISK" >/dev/null
-sgdisk -n1:0:+1G -t1:ef00 -c1:EFI -n2:0:0 -t2:8304 -c2:porygon "$DISK" >/dev/null
+sgdisk -n1:0:+2G -t1:ef00 -c1:EFI -n2:0:0 -t2:8304 -c2:porygon "$DISK" >/dev/null
 partprobe "$DISK"; udevadm settle
 part() { lsblk -lpno NAME "$DISK" | sed -n "$(( $1 + 1 ))p"; }
 ESP=$(part 1); ROOT=$(part 2)
 mkfs.fat -F32 -n EFI "$ESP" >/dev/null
-mkfs.xfs -f -L porygon "$ROOT" >/dev/null
-# name the filesystems outright: on a fresh partition, mount's own type
-# detection can miss (it tried squashfs on XFS during testing)
-modprobe -q xfs || true
+mkfs.btrfs -f -L porygon "$ROOT" >/dev/null
+modprobe -q btrfs || true
 udevadm settle
-mount -t xfs "$ROOT" /mnt
+# subvolumes: the system, your home, logs and the package cache. Snapshots
+# cover only @, so rolling back never touches your files or loses logs.
+mount -t btrfs "$ROOT" /mnt
+for sv in @ @home @log @pkg; do btrfs -q subvolume create "/mnt/$sv"; done
+umount /mnt
+OPTS=noatime,compress=zstd:1
+mount -t btrfs -o subvol=/@,$OPTS "$ROOT" /mnt
+mount --mkdir -t btrfs -o subvol=/@home,$OPTS "$ROOT" /mnt/home
+mount --mkdir -t btrfs -o subvol=/@log,$OPTS "$ROOT" /mnt/var/log
+mount --mkdir -t btrfs -o subvol=/@pkg,$OPTS "$ROOT" /mnt/var/cache/pacman/pkg
 mount --mkdir -t vfat -o umask=0077 "$ESP" /mnt/boot
 
 # --- copy the live system ---
 say "Copying the system (a few minutes)"
 rsync -aAXH --info=progress2 --no-inc-recursive \
-    --exclude={/dev/*,/proc/*,/sys/*,/run/*,/tmp/*,/mnt/*,/boot/*,/home/porygon,/var/cache/pacman/pkg/*,/var/log/journal/*,/etc/machine-id,/etc/pacman.d/gnupg/*} \
+    --exclude={/dev/*,/proc/*,/sys/*,/run/*,/tmp/*,/mnt/*,/boot/*,/home/*,/var/cache/pacman/pkg/*,/var/log/*,/etc/machine-id,/etc/pacman.d/gnupg/*} \
     / /mnt/
-cp $BOOTMNT/vmlinuz-$KVER /mnt/boot/
-# Manjaro keeps the kernel version in this file; mkinitcpio needs it
-[ -f /mnt/boot/linux72-x86_64.kver ] || ls /mnt/usr/lib/modules | grep -m1 MANJARO > /mnt/boot/linux72-x86_64.kver
-for u in intel-ucode amd-ucode; do
-    [ -f /run/archiso/bootmnt/porygon/boot/$u.img ] && cp /run/archiso/bootmnt/porygon/boot/$u.img /mnt/boot/
-done
 
 # --- undo the live-USB bits ---
 say "Configuring"
@@ -136,16 +138,57 @@ passwd -l root >/dev/null
 CHROOT
 printf '%s:%s\n' "$USERNAME" "$PW1" | arch-chroot /mnt chpasswd
 
-# boot splash in the startup image, then the themed GRUB menu
-sed -i 's/^HOOKS=(base udev /HOOKS=(base udev plymouth /' /mnt/etc/mkinitcpio.conf
-grep -q plymouth /mnt/etc/mkinitcpio.conf || sed -i 's/^HOOKS=(base /HOOKS=(base plymouth /' /mnt/etc/mkinitcpio.conf
+# --- drivers: Manjaro's hardware detection picks the graphics driver ---
+if ping -c1 -W3 mirror.init7.net >/dev/null 2>&1; then
+    say "Choosing graphics drivers"
+    arch-chroot /mnt /bin/bash -c 'pacman -Sy >/dev/null 2>&1; mhwd -a pci nonfree 0300 --noconfirm' >/dev/null 2>&1 ||
+        say "Driver detection didn't finish; the open-source drivers stay (run 'sudo mhwd -a pci nonfree 0300' later)."
+fi
+
+# --- boot: Limine with Porygon's theme, kernels on the EFI partition ---
+say "Setting up the boot menu and snapshots"
+UUID=$(blkid -s UUID -o value "$ROOT")
+cat > /mnt/etc/mkinitcpio.conf.d/porygon.conf <<'HOOKS'
+# Porygon: boot splash early; btrfs-overlayfs lets a read-only snapshot boot
+# with a temporary writable layer on top
+HOOKS=(base udev plymouth autodetect microcode modconf kms keyboard keymap block filesystems btrfs-overlayfs)
+HOOKS
+cat > /mnt/etc/default/limine <<LIMINE
+# Porygon's Limine settings (see /etc/limine-entry-tool.conf for every option)
+TARGET_OS_NAME="Porygon"
+ESP_PATH="/boot"
+KERNEL_CMDLINE[default]="root=UUID=$UUID rootflags=subvol=/@ rw quiet splash loglevel=3"
+ENABLE_LIMINE_FALLBACK=yes
+# the main kernel first (it's the default), then the LTS, then snapshots
+BOOT_ORDER="linux72*, *, *fallback, Snapshots"
+FIND_BOOTLOADERS=no
+MAX_SNAPSHOT_ENTRIES=8
+LIMINE
+mkdir -p /mnt/boot/porygon
+cp /usr/share/porygon/limine/background.png /mnt/boot/porygon/
+cp /usr/share/porygon/limine/theme.conf /mnt/boot/limine.conf
+# Porygon's own sudo rule: graphical admin tools (Btrfs Assistant) keep the display
+echo 'Defaults env_keep += "DISPLAY XAUTHORITY"' > /mnt/etc/sudoers.d/20-display
+chmod 440 /mnt/etc/sudoers.d/20-display
+# the boot-menu tools aren't on the live system (their hooks would take over
+# the USB's own start-up image), so they go straight onto the new one
+mkdir -p /mnt/var/cache/porygon-pkgs; cp $PKGS/*.pkg.tar.zst /mnt/var/cache/porygon-pkgs/
 arch-chroot /mnt /bin/bash -e <<'BOOT'
-mkinitcpio -P >/dev/null 2>&1 || mkinitcpio -P
-grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Porygon >/dev/null 2>&1 || true
-grub-install --target=x86_64-efi --efi-directory=/boot --removable >/dev/null 2>&1
-grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1
+pacman -Rdd --noconfirm grub >/dev/null 2>&1 || true
+rm -f /etc/default/grub
+pacman -U --noconfirm --needed /var/cache/porygon-pkgs/*.pkg.tar.zst >/dev/null
+rm -rf /var/cache/porygon-pkgs
+limine-install >/dev/null
+limine-mkinitcpio >/dev/null 2>&1
+# snapshots: Snapper keeps up to 10 (5 marked important), none on a timer;
+# snap-pac takes one before and after every update
+snapper --no-dbus -c root create-config /
+sed -i 's/^TIMELINE_CREATE=.*/TIMELINE_CREATE="no"/; s/^NUMBER_LIMIT=.*/NUMBER_LIMIT="10"/; s/^NUMBER_LIMIT_IMPORTANT=.*/NUMBER_LIMIT_IMPORTANT="5"/' /etc/snapper/configs/root
+systemctl enable limine-snapper-sync.service snapper-cleanup.timer >/dev/null 2>&1
+snapper --no-dbus -c root create -d "Porygon installed" -c number
+limine-snapper-sync >/dev/null 2>&1 || true
 BOOT
-[ -f /mnt/boot/grub/grub.cfg ] || die "Couldn't set up the boot menu."
+grep -q 'protocol: linux' /mnt/boot/limine.conf || die "Couldn't set up the boot menu."
 
 sync
 umount -R /mnt

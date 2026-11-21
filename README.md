@@ -18,7 +18,11 @@ British English and Russian, offline dictionaries) and an offline Russian course
   recipe to build on Manjaro (Rust, bindgen and Manjaro's kernel headers).
 - **Desktop:** MaXX Interactive Desktop 2.2.0 (5Dwm, Toolchest, ROX desktop)
   started straight from tty1, no login screen
-- **Root filesystem:** XFS, as on IRIX
+- **Root filesystem:** Btrfs (subvolumes `@`, `@home`, `@log`, `@pkg`, zstd
+  compression), with Snapper taking a snapshot before and after every update
+- **Boot menu:** Limine, themed with the Porygon backdrop. Every snapshot is in
+  the menu with the kernel it had (limine-snapper-sync); booting one is safe to
+  try, and Porygon offers to keep it. Two kernels: `linux72` and the `linux618` LTS
 - **Laptop bits:** NetworkManager (`nmtui`), PipeWire, power-profiles-daemon,
   thermald, tap-to-click, brightness and volume keys
 - **Apps:** Firefox, pamac (Add/Remove Software), qmmp, mpv, Kiwix, xpdf, pavucontrol, fastfetch
@@ -60,6 +64,19 @@ British English and Russian, offline dictionaries) and an offline Russian course
   Privacy page lists everything that uses the network.
 - **Power:** thermald, power-saver profile on battery, sleeping PCI/USB devices
   (not keyboards and mice), sound-chip and Wi-Fi power saving, NMI watchdog off.
+- **Updates that don't bite:**
+  - `upgrade` shows Manjaro's known issues for the update first (from the
+    stable-update announcement), marking any that name a package you have.
+  - `upgrade undo` / Toolchest → Porygon → Undo an Update: back to before an
+    update via the boot menu's snapshots. Btrfs Assistant browses them all.
+  - `upgrade later`: download now, install at shutdown (pamac's offline upgrade).
+  - AUR builds check their dependencies first. Anything Manjaro stable is
+    missing or has too old is built from Arch's own recipe, once, and replaced
+    by Manjaro's package when stable catches up. Nothing else is compiled.
+  - After an update, AUR programs left broken by a library change are found and
+    offered a rebuild.
+  - AUR lookups are cached for a day.
+  - The installer runs Manjaro's hardware detection (`mhwd`) for graphics drivers.
 - **What's New:** after `upgrade` ("Porygon evolved into Porygon2!") or
   `dubious-disc` ("Porygon2 evolved into Porygon-Z!"), a window lists what
   changed.
@@ -86,7 +103,8 @@ inside a clean Manjaro chroot (`gtk2` takes the longest); later builds reuse the
 
 - The live USB logs in as `porygon` and starts the desktop.
 - To install: open a terminal and run `porygon-install`. It's UEFI-only and
-  erases the disk you pick by number.
+  erases the disk you pick by number: 2 GiB EFI partition (Limine and the
+  kernels, including one per snapshot), the rest Btrfs.
 - Wi-Fi: `nmtui` in a terminal.
 
 ## Commands
@@ -96,6 +114,8 @@ inside a clean Manjaro chroot (`gtk2` takes the longest); later builds reuse the
 | `upgrade` | update the system (via pamac) |
 | `upgrade install PKG` | install, picking the source by number: Manjaro stable, testing or unstable (when newer there), or the AUR. A testing/unstable choice sticks through updates |
 | `upgrade branches` | programs on testing/unstable; move one back to stable |
+| `upgrade later` | download updates now, install them at shutdown |
+| `upgrade undo` | go back to before an update (boot menu → Snapshots) |
 | `upgrade remove PKG` / `search TERM` / `info PKG` / `list` / `clean` | the usual |
 | `upgrade mirrors` | pick the fastest Manjaro mirrors |
 | `porygon-z` | talk to Porygon-Z (`--journal` keeps the conversation) |
@@ -111,6 +131,7 @@ inside a clean Manjaro chroot (`gtk2` takes the longest); later builds reuse the
 | Porygon's own files (scripts, build profile, `art/`) | not chosen yet |
 | MaXX Interactive Desktop | MaXX's own licence, © Eric Masson: the older code may be redistributed only as unmodified binaries; newer code is BSD-3-Clause. Full text in `/opt/MaXX/doc/LICENSE` |
 | systemd (liberated fork) | LGPL-2.1-or-later, with some GPL-2.0-or-later parts |
+| limine-mkinitcpio-hook, limine-snapper-sync (prebuilt in `repo/`) | GPL-3.0 |
 | Everything else from Manjaro | each package's own licence, in `/usr/share/licenses` |
 
 "Porygon" is a Pokémon name owned by Nintendo, Creatures and Game Freak.

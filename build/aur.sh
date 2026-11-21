@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 TOP=$PWD
 CONF=$1                       # rendered Manjaro pacman.conf from build.sh
 MIRROR=$2
-PKGS=(ncurses5-compat-libs libjpeg6-turbo libpng15 libtiff5 gtk2 maxx-desktop systemd-liberated-git porygon-piper)
+PKGS=(ncurses5-compat-libs libjpeg6-turbo libpng15 libtiff5 gtk2 maxx-desktop systemd-liberated-git porygon-piper limine-mkinitcpio-hook limine-snapper-sync)
 B=${B:-/var/tmp/porygon-build}
 REPO=${REPO:-$B/repo}
 CH=$B/chroot
@@ -21,7 +21,7 @@ for p in "${PKGS[@]}"; do
         # Porygon's own recipes (build/pkgs/NAME)
         rm -rf "$AUR/$p"; cp -r "$TOP/build/pkgs/$p" "$AUR/$p"
     elif [ -d "$AUR/$p" ]; then git -C "$AUR/$p" pull -q; else git clone -q "https://aur.archlinux.org/$p.git" "$AUR/$p"; fi
-    ver=$(grep -E '^(pkgver|pkgrel)=' "$AUR/$p/PKGBUILD" | cut -d= -f2 | paste -sd-)
+    ver=$(cd "$AUR/$p" && bash -c 'source ./PKGBUILD >/dev/null 2>&1; echo "$pkgver-$pkgrel"')
     if [[ $p == *-git ]]; then
         # -git packages get their version from the newest commit, so any
         # build counts; delete it from repo/ (or run dubious-disc) to refresh
@@ -56,7 +56,9 @@ if [ ${#todo[@]} -gt 0 ]; then
         flags="-s --noconfirm --needed --skippgpcheck --nocheck -c -f"
         # maxx-desktop only unpacks a tarball, so its runtime deps aren't needed to package it
         [ "$p" = maxx-desktop ] && flags="-d --noconfirm -c -f"
-        arch-chroot "$CH" runuser -u builder -- env https_proxy="${https_proxy:-}" HTTPS_PROXY="${HTTPS_PROXY:-}" \
+        # its own PID namespace with a matching /proc: GraalVM's native-image
+        # (used by the Limine tools) watches its parent through /proc/PID
+        arch-chroot "$CH" unshare --pid --fork --propagation unchanged --mount-proc runuser -u builder -- env https_proxy="${https_proxy:-}" HTTPS_PROXY="${HTTPS_PROXY:-}" \
             bash -c "cd /build/$p && PKGDEST=/build/out makepkg $flags"
         mv "$CH"/build/out/*.pkg.tar.zst "$REPO"/
     done

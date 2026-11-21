@@ -45,6 +45,11 @@ P=$B/profile          # on disk: it can hold your music and Porygon-Z's model
 rm -rf "$P"; mkdir -p "$P"
 cp -a profile/. "$P/"
 cp "$CONF" "$P/pacman.conf"
+# the boot-menu tools ride on the USB as package files; porygon-install puts
+# them on the installed system (on the live system their pacman hooks would
+# replace the USB's own start-up image)
+mkdir -p "$P/airootfs/usr/share/porygon/pkgs"
+cp "$REPO"/limine-mkinitcpio-hook-*.pkg.tar.zst "$REPO"/limine-snapper-sync-*.pkg.tar.zst "$P/airootfs/usr/share/porygon/pkgs/"
 # your pictures (kept out of git): art/logo.png -> boot menu, boot splash
 # and icons; art/fastfetch.png -> fastfetch. Without them, the plain
 # polygon mark is used.

@@ -43,4 +43,8 @@ file_permissions=(
   ["/usr/local/bin/porygon-wellbeing"]="0:0:755"
   ["/usr/lib/porygon/porygon-z-models"]="0:0:755"
   ["/usr/lib/porygon/power-source"]="0:0:755"
+  ["/usr/local/bin/porygon-undo"]="0:0:755"
+  ["/usr/lib/porygon/snapshot-check"]="0:0:755"
+  ["/usr/lib/porygon/aur-guard"]="0:0:755"
+  ["/usr/lib/porygon/known-issues"]="0:0:755"
 )

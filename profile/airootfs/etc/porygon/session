@@ -10,5 +10,7 @@ xbindkeys -f /etc/porygon/xbindkeysrc &
 (sleep 3; porygon-chime) &
 # night light and the gentle rest/bedtime reminders
 porygon-wellbeing &
+# started from a snapshot? offer to keep it
+/usr/lib/porygon/snapshot-check &
 (sleep 9; porygon-welcome --first-login) &
 exec /opt/MaXX/etc/skel/Xsession.dt
