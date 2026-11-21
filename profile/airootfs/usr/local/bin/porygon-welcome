@@ -66,10 +66,15 @@ PAGES = [
         "  •  Right-click the desktop for the background menu",
     ], [("Show the Toolchest's Demos", lambda: show("demos"))]),
     ("network", "Network", "Connect to Wi-Fi", [
-        "Porygon uses NetworkManager. The network setup runs in a terminal "
-        "(it's 1996, after all): pick “Activate a connection”, choose "
-        "your network and type the password.",
-    ], [("Open Network Setup", lambda: term("nmtui", hold=False))]),
+        "The strip at the top of the screen shows your network, Bluetooth, "
+        "brightness, volume and battery; click any of them for its controls.",
+        "",
+        "Wireless Networks lists what's in range: double-click one and type "
+        "the password. Hidden networks, VPNs and fixed addresses are in "
+        "Advanced Setup, which runs in a terminal (it's 1996, after all).",
+    ], [("Wireless Networks", lambda: run("porygon-wifi")),
+        ("Bluetooth", lambda: run("blueman-manager")),
+        ("Advanced Setup", lambda: term("nmtui", hold=False))]),
     ("install", "Install", "Install Porygon", [
         "You're running Porygon from the USB stick. Porygon Setup copies this "
         "system onto a disk you choose, asking a few questions on the way.",

@@ -108,7 +108,10 @@ Menu Porygon
 	"Undo an Update"	f.exec "$W bash -c 'porygon-undo; echo; read -n1 -rsp \"Press any key to close.\"'"
 	"Snapshots"		f.exec "$W bash -c 'sudo btrfs-assistant'"
 	separator		f.separator
-	"Network Setup"		f.exec "$W nmtui"
+	"Wi-Fi"			f.exec "porygon-wifi"
+	"Bluetooth"		f.exec "blueman-manager"
+	"Sound Mixer"		f.exec "pavucontrol"
+	"Network Setup (advanced)"	f.exec "$W nmtui"
 MENU
     [ -n "$live" ] && printf '\t"Install Porygon"\tf.exec "porygon-installer"\n'
     cat <<MENU

@@ -9,7 +9,7 @@ MIRROR=${MIRROR:-https://mirror.init7.net/manjaro}
 if [ "$(id -u)" != 0 ]; then
     # WSL sometimes starts without terminal devices (/dev/pts), and sudo
     # then refuses to run ("unable to allocate pty"). Say how to get past it.
-    if ! ls /dev/pts/[0-9]* >/dev/null 2>&1; then
+    if ! grep -q " /dev/pts devpts " /proc/mounts; then
         echo "WSL started without its terminal devices, so sudo won't run."
         echo "In PowerShell, either restart WSL:   wsl --shutdown"
         echo "or build as root:  wsl -d archlinux -u root bash $TOP/build.sh"

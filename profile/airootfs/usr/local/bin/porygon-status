@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""Porygon's status strip: Wi-Fi, Bluetooth, brightness, volume, battery and
+the time, in a small bevelled bar at the top of the screen. Click a part for
+its controls. Also gives the low-battery warnings.
+
+    porygon-status          (started by the Porygon session)
+"""
+import glob, os, shutil, subprocess, threading, time, tkinter as tk
+
+BG, PANEL, FIELD, WHITE = "#d9d3dd", "#c3bccb", "#f0c4d0", "#fbf8fc"
+PINK, PINK_DARK, BLUE, BLUE_DARK, INK, RED = "#ec849d", "#b04a68", "#5496ce", "#265284", "#1a1020", "#b02030"
+FONT, FONT_B, MONO = ("Helvetica", 10), ("Helvetica", 10, "bold"), ("Courier", 10)
+have = shutil.which
+
+
+def sh(*cmd, timeout=4):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).stdout.strip()
+    except Exception:
+        return ""
+
+
+def bg(*cmd):
+    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def read(path, default=""):
+    try:
+        return open(path).read().strip()
+    except OSError:
+        return default
+
+
+def bars(signal):
+    n = 0 if signal < 15 else 1 if signal < 35 else 2 if signal < 55 else 3 if signal < 75 else 4
+    return "▂▄▆█"[:n].ljust(4, "·")
+
+
+class Status:
+    def __init__(self):
+        self.r = tk.Tk()
+        self.r.title("Porygon Status")
+        self.r.overrideredirect(True)
+        self.r.attributes("-topmost", True)
+        self.r.configure(bg=PINK_DARK)
+        self.bar = tk.Frame(self.r, bg=PANEL, bd=2, relief="raised")
+        self.bar.pack(padx=1, pady=(0, 1))
+        self.parts, self.popup = {}, None
+        for key in ("wifi", "bt", "light", "vol", "batt", "clock"):
+            lab = tk.Label(self.bar, text="", bg=PANEL, fg=INK, font=FONT_B, padx=8, pady=2, cursor="hand2")
+            lab.bind("<Button-1>", lambda e, k=key: self.click(k))
+            lab.bind("<Button-3>", lambda e, k=key: self.click(k, right=True))
+            self.parts[key] = lab
+        self.warned = set()
+        self.slow = {}
+        threading.Thread(target=self.slow_loop, daemon=True).start()
+        self.tick()
+
+    # --- reading the hardware --------------------------------------------
+    def slow_loop(self):
+        """Wi-Fi and Bluetooth ask other programs, so every 10 s off the UI thread."""
+        while True:
+            info = {}
+            if have("nmcli"):
+                if sh("nmcli", "radio", "wifi") == "disabled":
+                    info["wifi"] = "Wi-Fi off"
+                else:
+                    line = next((l for l in sh("nmcli", "-t", "-f", "IN-USE,SIGNAL,SSID", "dev", "wifi",
+                                               "list", "--rescan", "no").splitlines() if l.startswith("*")), "")
+                    if line:
+                        _, sig, ssid = line.split(":", 2)
+                        info["wifi"] = f"{bars(int(sig or 0))} {ssid[:18]}"
+                    else:
+                        wired = "ethernet:connected" in sh("nmcli", "-t", "-f", "TYPE,STATE", "dev")
+                        info["wifi"] = "Wired" if wired else "No network"
+            if have("bluetoothctl") and glob.glob("/sys/class/bluetooth/hci*"):
+                if "Powered: yes" in sh("bluetoothctl", "show"):
+                    conn = sh("bluetoothctl", "devices", "Connected").splitlines()
+                    info["bt"] = "BT " + (conn[0].split(" ", 2)[-1][:14] if conn else "on")
+                else:
+                    info["bt"] = "BT off"
+            self.slow = info
+            time.sleep(10)
+
+    def battery(self):
+        for b in sorted(glob.glob("/sys/class/power_supply/BAT*")):
+            cap = read(f"{b}/capacity")
+            if cap.isdigit():
+                return int(cap), read(f"{b}/status")
+        return None, None
+
+    def brightness(self):
+        out = sh("brightnessctl", "-m") if have("brightnessctl") and glob.glob("/sys/class/backlight/*") else ""
+        try:
+            return int(out.split(",")[3].rstrip("%"))
+        except (IndexError, ValueError):
+            return None
+
+    def volume(self):
+        if not have("pamixer"):
+            return None
+        v = sh("pamixer", "--get-volume-human")
+        return v or None
+
+    # --- the strip ---------------------------------------------------------
+    def tick(self):
+        text = {"wifi": self.slow.get("wifi"), "bt": self.slow.get("bt")}
+        b = self.brightness()
+        text["light"] = f"☀ {b}%" if b is not None else None
+        v = self.volume()
+        text["vol"] = ("♪ mute" if v == "muted" else f"♪ {v}") if v else None
+        cap, state = self.battery()
+        if cap is not None:
+            sign = "+" if state in ("Charging", "Full") or state == "Not charging" else ""
+            text["batt"] = f"▮ {cap}%{sign}"
+            self.parts["batt"].configure(fg=RED if cap <= 15 and not sign else INK)
+            self.low_battery(cap, state)
+        text["clock"] = time.strftime("%H:%M")
+        for key, lab in self.parts.items():
+            if text.get(key):
+                lab.configure(text=text[key])
+                if not lab.winfo_ismapped():
+                    self.repack()
+            elif lab.winfo_ismapped():
+                lab.pack_forget()
+        self.place()
+        self.r.lift()          # stay above new windows (the window manager doesn't manage it)
+        if self.popup:
+            self.popup.lift()
+        self.r.after(3000, self.tick)
+
+    def repack(self):
+        for lab in self.parts.values():
+            lab.pack_forget()
+        for key, lab in self.parts.items():
+            if lab.cget("text"):
+                lab.pack(side="left")
+
+    def place(self):
+        self.r.update_idletasks()
+        w = self.r.winfo_reqwidth()
+        x = (self.r.winfo_screenwidth() - w) // 2
+        self.r.geometry(f"+{x}+0")
+
+    def low_battery(self, cap, state):
+        if state != "Discharging":
+            self.warned.clear(); return
+        for level, title, body in ((15, "Battery low", f"{cap}% left. Time to find the charger."),
+                                   (7, "Battery very low", f"{cap}% left. Plug in soon; Porygon will sleep at 3%.")):
+            if cap <= level and level not in self.warned:
+                self.warned.add(level)
+                bg("porygon-nudge", title, body, "ok=OK")
+        if cap <= 3 and 3 not in self.warned:
+            self.warned.add(3)
+            bg("sh", "-c", "porygon-nudge 'Going to sleep' 'The battery is almost empty, so Porygon is going to sleep to keep your work safe.' ok=OK & sleep 20; systemctl suspend")
+
+    # --- popups ------------------------------------------------------------
+    def close_popup(self, *_):
+        if self.popup:
+            self.popup.destroy(); self.popup = None
+
+    def open_popup(self, under, title):
+        self.close_popup()
+        p = self.popup = tk.Toplevel(self.r)
+        p.overrideredirect(True); p.attributes("-topmost", True); p.configure(bg=PINK_DARK)
+        f = tk.Frame(p, bg=BG, bd=2, relief="raised"); f.pack(padx=1, pady=1)
+        head = tk.Frame(f, bg=PINK); head.pack(fill="x")
+        tk.Label(head, text=title, bg=PINK, fg=INK, font=FONT_B, padx=8, pady=2).pack(side="left")
+        x = tk.Label(head, text=" × ", bg=PINK, fg=INK, font=FONT_B, cursor="hand2"); x.pack(side="right")
+        x.bind("<Button-1>", self.close_popup)
+        body = tk.Frame(f, bg=BG); body.pack(fill="both", padx=10, pady=8)
+        p.bind("<Escape>", self.close_popup)
+        self.r.update_idletasks()
+        p.geometry(f"+{under.winfo_rootx()}+{self.r.winfo_rooty() + self.r.winfo_height() + 2}")
+        return body
+
+    def button(self, parent, text, cmd):
+        return tk.Button(parent, text=text, command=cmd, bg=PANEL, activebackground=FIELD, bd=2,
+                         relief="raised", font=FONT, padx=8)
+
+    def slider(self, parent, value, setter):
+        s = tk.Scale(parent, from_=0, to=100, orient="horizontal", length=220, showvalue=True,
+                     bg=BG, troughcolor=WHITE, activebackground=PINK, highlightthickness=0, bd=1,
+                     sliderrelief="raised", font=FONT, command=lambda v: setter(int(float(v))))
+        s.set(value); s.pack(fill="x")
+        return s
+
+    def click(self, key, right=False):
+        if self.popup and getattr(self, "open_key", None) == key:
+            self.close_popup(); return
+        self.open_key = key
+        lab = self.parts[key]
+        if key == "wifi":
+            self.close_popup(); bg("porygon-wifi")
+        elif key == "bt":
+            self.close_popup()
+            if right:
+                on = "Powered: yes" in sh("bluetoothctl", "show")
+                bg("bluetoothctl", "power", "off" if on else "on")
+            else:
+                bg("blueman-manager")
+        elif key == "light":
+            b = self.open_popup(lab, "Brightness")
+            self.slider(b, self.brightness() or 50, lambda v: bg("brightnessctl", "-q", "set", f"{max(v, 1)}%"))
+        elif key == "vol":
+            b = self.open_popup(lab, "Volume")
+            cur = sh("pamixer", "--get-volume")
+            self.slider(b, int(cur) if cur.isdigit() else 50, lambda v: bg("pamixer", "--set-volume", str(v)))
+            row = tk.Frame(b, bg=BG); row.pack(fill="x", pady=(6, 0))
+            self.button(row, "Mute / unmute", lambda: bg("pamixer", "-t")).pack(side="left")
+            self.button(row, "Mixer…", lambda: (self.close_popup(), bg("pavucontrol"))).pack(side="right")
+        elif key == "batt":
+            b = self.open_popup(lab, "Battery and Power")
+            info = sh("upower", "-i", sh("upower", "-e").split("\n")[0] if have("upower") else "")
+            when = next((l.split(":", 1)[1].strip() for l in info.splitlines() if "time to" in l), "")
+            cap, state = self.battery()
+            tk.Label(b, text=f"{cap}%  -  {state}" + (f", {when}" if when else ""), bg=BG, font=FONT_B, anchor="w").pack(fill="x")
+            if have("powerprofilesctl"):
+                tk.Label(b, text="Power profile:", bg=BG, anchor="w").pack(fill="x", pady=(8, 2))
+                prof = tk.StringVar(value=sh("powerprofilesctl", "get"))
+                names = {"power-saver": "Power saver (longest battery)", "balanced": "Balanced",
+                         "performance": "Performance"}
+                avail = sh("powerprofilesctl", "list")
+                for k, n in names.items():
+                    if k in avail:
+                        tk.Radiobutton(b, text=n, value=k, variable=prof, bg=BG, activebackground=BG,
+                                       selectcolor=WHITE, anchor="w",
+                                       command=lambda: bg("powerprofilesctl", "set", prof.get())).pack(fill="x")
+        elif key == "clock":
+            b = self.open_popup(lab, time.strftime("%A %-d %B %Y"))
+            tk.Label(b, text=sh("cal"), bg=WHITE, fg=INK, font=MONO, justify="left", bd=2,
+                     relief="sunken", padx=6, pady=4).pack()
+
+
+if __name__ == "__main__":
+    Status().r.mainloop()

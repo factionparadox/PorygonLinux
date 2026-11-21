@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""Porygon's Wi-Fi window: the networks in range, connect, disconnect, Wi-Fi
+on/off. NetworkManager does the work (nmcli); nmtui is a button away for
+anything unusual (hidden networks, VPNs, fixed addresses)."""
+import shutil, subprocess, threading, tkinter as tk
+from tkinter import simpledialog, messagebox
+
+BG, PANEL, FIELD, WHITE = "#d9d3dd", "#c3bccb", "#f0c4d0", "#fbf8fc"
+PINK, INK, BLUE_DARK, RED = "#ec849d", "#1a1020", "#265284", "#b02030"
+FONT, FONT_B, MONO = ("Helvetica", 10), ("Helvetica", 10, "bold"), ("Courier", 10)
+
+
+def nm(*args, timeout=30):
+    r = subprocess.run(["nmcli", *args], capture_output=True, text=True, timeout=timeout)
+    return r.returncode, (r.stdout + r.stderr).strip()
+
+
+def bars(signal):
+    n = 0 if signal < 15 else 1 if signal < 35 else 2 if signal < 55 else 3 if signal < 75 else 4
+    return "▂▄▆█"[:n].ljust(4, "·")
+
+
+class Wifi:
+    def __init__(self):
+        self.r = tk.Tk(); self.r.title("Wireless Networks"); self.r.configure(bg=BG)
+        self.r.geometry("440x380"); self.r.option_add("*Font", FONT)
+        head = tk.Frame(self.r, bg=PINK, bd=2, relief="raised"); head.pack(fill="x")
+        tk.Label(head, text="Wireless Networks", bg=PINK, fg=INK, font=("Helvetica", 13, "bold italic"),
+                 padx=10, pady=4).pack(side="left")
+        self.on = tk.IntVar(value=nm("radio", "wifi")[1] == "enabled")
+        tk.Checkbutton(head, text="Wi-Fi on", variable=self.on, bg=PINK, activebackground=PINK,
+                       selectcolor=WHITE, command=self.toggle).pack(side="right", padx=8)
+        box = tk.Frame(self.r, bg=BG, bd=2, relief="sunken"); box.pack(fill="both", expand=True, padx=10, pady=(10, 4))
+        self.lb = tk.Listbox(box, bg=WHITE, fg=INK, selectbackground=PINK, selectforeground=INK, bd=0,
+                             highlightthickness=0, font=MONO, activestyle="none")
+        self.lb.pack(fill="both", expand=True)
+        self.lb.bind("<Double-Button-1>", lambda e: self.connect())
+        self.msg = tk.Label(self.r, text="", bg=BG, fg=BLUE_DARK, anchor="w"); self.msg.pack(fill="x", padx=12)
+        row = tk.Frame(self.r, bg=BG); row.pack(fill="x", padx=10, pady=8)
+        mk = lambda t, c: tk.Button(row, text=t, command=c, bg=PANEL, activebackground=FIELD, bd=2, relief="raised", padx=8)
+        mk("Connect", self.connect).pack(side="left")
+        mk("Disconnect", self.disconnect).pack(side="left", padx=6)
+        mk("Refresh", lambda: self.scan(True)).pack(side="left")
+        mk("Close", self.r.destroy).pack(side="right")
+        mk("Advanced…", lambda: subprocess.Popen(["/opt/MaXX/bin/winterm", "nmtui"])).pack(side="right", padx=6)
+        self.nets = []
+        self.scan(True)
+
+    def busy(self, text, work, then=None):
+        self.msg.configure(text=text)
+        def run():
+            out = work()
+            self.r.after(0, lambda: then(out) if then else None)
+        threading.Thread(target=run, daemon=True).start()
+
+    def scan(self, rescan=False):
+        if not self.on.get():
+            self.lb.delete(0, "end"); self.lb.insert("end", "  Wi-Fi is off."); self.msg.configure(text=""); return
+        def work():
+            return nm("-t", "-f", "IN-USE,SIGNAL,SECURITY,SSID", "dev", "wifi", "list", "--rescan", "yes" if rescan else "no")[1]
+        self.busy("Looking for networks…", work, self.show)
+
+    def show(self, out):
+        self.lb.delete(0, "end"); self.nets = []
+        seen = set()
+        for line in out.splitlines():
+            parts = line.split(":", 3)
+            if len(parts) < 4 or not parts[3] or parts[3] in seen:
+                continue
+            use, sig, sec, ssid = parts; seen.add(ssid)
+            self.nets.append((ssid, sec not in ("", "--"), use == "*"))
+            lock = "🔒" if sec not in ("", "--") else "  "
+            self.lb.insert("end", f" {'●' if use == '*' else ' '} {bars(int(sig or 0))} {lock} {ssid}")
+        if not self.nets:
+            self.lb.insert("end", "  No networks found.")
+        self.msg.configure(text="Double-click a network to connect.")
+
+    def chosen(self):
+        sel = self.lb.curselection()
+        return self.nets[sel[0]] if sel and sel[0] < len(self.nets) else None
+
+    def connect(self):
+        net = self.chosen()
+        if not net:
+            return
+        ssid, secured, _ = net
+        known = ssid in nm("-t", "-f", "NAME", "connection", "show")[1].splitlines()
+        args = ["dev", "wifi", "connect", ssid]
+        if secured and not known:
+            pw = simpledialog.askstring("Wireless Networks", f"Password for {ssid}:", show="*", parent=self.r)
+            if pw is None:
+                return
+            args += ["password", pw]
+        elif known:
+            args = ["connection", "up", "id", ssid]
+        def done(res):
+            code, out = res
+            if code == 0:
+                self.msg.configure(text=f"Connected to {ssid}."); self.scan()
+            else:
+                self.msg.configure(text="")
+                messagebox.showerror("Wireless Networks", f"Couldn't connect to {ssid}:\n\n{out[-300:]}", parent=self.r)
+        self.busy(f"Connecting to {ssid}…", lambda: nm(*args, timeout=60), done)
+
+    def disconnect(self):
+        dev = next((l.split(":")[0] for l in nm("-t", "-f", "DEVICE,TYPE,STATE", "dev")[1].splitlines()
+                    if ":wifi:connected" in l), None)
+        if dev:
+            self.busy("Disconnecting…", lambda: nm("dev", "disconnect", dev), lambda _: self.scan())
+
+    def toggle(self):
+        self.busy("", lambda: nm("radio", "wifi", "on" if self.on.get() else "off"),
+                  lambda _: self.r.after(2500, lambda: self.scan(True)))
+
+
+if __name__ == "__main__":
+    if not shutil.which("nmcli"):
+        raise SystemExit("NetworkManager (nmcli) isn't installed.")
+    Wifi().r.mainloop()

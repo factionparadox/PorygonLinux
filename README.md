@@ -24,8 +24,15 @@ British English and Russian, offline dictionaries) and an offline Russian course
   the menu with the kernel it had (limine-snapper-sync); booting one is safe to
   try, and Porygon offers to keep it. Kernel: `linux72` (Manjaro no longer
   ships 7.1)
-- **Laptop bits:** NetworkManager (`nmtui`), PipeWire, power-profiles-daemon,
-  thermald, tap-to-click, brightness and volume keys
+- **Laptop bits:** a status strip at the top of the screen (`porygon-status`)
+  showing Wi-Fi, Bluetooth, brightness, volume, battery and the time; click a
+  part for its controls (Wi-Fi window, Blueman, sliders, power profiles, a
+  calendar). Low-battery warnings at 15% and 7%, sleep at 3%. NetworkManager,
+  BlueZ, PipeWire, power-profiles-daemon, thermald, tap-to-click, brightness
+  and volume keys
+- **Terminal:** MaXX's winterm running fish, with a Porygon-coloured prompt and
+  short forms (`up` = upgrade, `in` = upgrade install, `undo`). The text
+  consoles keep bash
 - **Apps:** Firefox, pamac (Add/Remove Software), qmmp, mpv, Kiwix, xpdf, pavucontrol, fastfetch
 
 ## What you get
