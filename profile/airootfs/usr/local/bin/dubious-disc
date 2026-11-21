@@ -4,5 +4,44 @@
 # the AUR has newer versions - including liberated systemd, rebuilt from
 # its newest commit (that one takes a while). Manjaro's pamac does the work.
 [ "$(id -u)" = 0 ] && { echo "Run dubious-disc as your normal user, not root."; exit 1; }
+
+R='\e[1;38;2;220;60;90m' P='\e[1;38;2;236;132;157m' B='\e[1;38;2;120;160;210m' D='\e[2m' N='\e[0m'
+[ -t 1 ] || R= P= B= D= N=
+
+# glitch TEXT COLOUR - the line arrives scrambled and settles into place
+glitch() {
+    local text=$1 c=$2 junk='#%&@$?!<>/\|=*~^01' i s n
+    if [ -t 1 ]; then
+        for n in 4 3 2 1; do
+            s=
+            for ((i = 0; i < ${#text}; i++)); do
+                if [ "${text:i:1}" != " " ] && (( RANDOM % 5 < n )); then s+=${junk:RANDOM%${#junk}:1}; else s+=${text:i:1}; fi
+            done
+            printf "\r  ${c}%s${N}" "$s"; sleep 0.06
+        done
+    fi
+    printf "\r  ${c}%s${N}\n" "$text"
+}
+
+echo
+glitch "DUBIOUS DISC" "$R"
+echo -e "  ${D}A transparent disc. The data on it doesn't match any known format.${N}"
+echo
+glitch "Inserting disc into Porygon2..." "$B"
+glitch "Checksum: ????????  -  installing anyway." "$P"
+glitch "New routines found for travelling between dimensions." "$P"
+echo
+
 start=$(date +%Y-%m-%dT%H:%M:%S)
-pamac upgrade --aur --devel "$@" && upgrade pinned && porygon-record-evolution dubious-disc "$start"
+if pamac upgrade --aur --devel "$@" && upgrade pinned; then
+    echo
+    glitch "Porygon2 evolved into Porygon-Z!" "$R"
+    echo -e "  ${D}The new code runs. Some of it does things nobody wrote it to do.${N}"
+    echo
+    porygon-record-evolution dubious-disc "$start"
+else
+    echo
+    glitch "The disc skipped. Porygon2 is unchanged." "$B"
+    echo -e "  ${D}Run dubious-disc again to retry.${N}"
+    exit 1
+fi
