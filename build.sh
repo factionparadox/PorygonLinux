@@ -1,18 +1,23 @@
 #!/bin/bash
 # Builds the Porygon ISO (Manjaro edition) into ./out.
-# Run on Arch or Manjaro (Arch WSL is fine): ./build.sh
+# Run on Arch or Manjaro (Arch WSL is fine), from any folder - including
+# one on a Windows drive: bash PorygonLinux/build.sh
 set -euo pipefail
-cd "$(dirname "$0")"
-TOP=$PWD
+TOP=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+cd "$TOP"
 MIRROR=${MIRROR:-https://mirror.init7.net/manjaro}
-[ "$(id -u)" = 0 ] || exec sudo MIRROR="$MIRROR" "$0" "$@"
-B=$TOP/.build
-mkdir -p "$B" out
+[ "$(id -u)" = 0 ] || exec sudo MIRROR="$MIRROR" bash "$TOP/build.sh" "$@"
+# All the build's working files live on the Linux side: a Windows drive
+# (/mnt/c...) can't hold the temporary Linux system the build makes.
+B=/var/tmp/porygon-build
+REPO=$B/repo
+mkdir -p "$B" "$REPO" "$TOP/out"
+cp -u "$TOP"/repo/*.pkg.tar.zst "$REPO"/ 2>/dev/null || true   # the prebuilt packages
 
 echo "==> Build tools"
 pacman -S --needed --noconfirm archiso arch-install-scripts git >/dev/null 2>&1
 
-echo "==> Manjaro keyring (kept in .build, your own keyring isn't touched)"
+echo "==> Manjaro keyring (kept in $B, your own keyring isn't touched)"
 if [ ! -f "$B/gnupg/.populated" ]; then
     curl -fsS "$MIRROR/stable/core/x86_64/core.db" -o "$B/core.db"
     kr=$(bsdtar -xOf "$B/core.db" '*manjaro-keyring-*/desc' | sed -n '/%FILENAME%/{n;p}')
@@ -28,10 +33,10 @@ echo "    (Manjaro's SSL certificate is still valid. We checked.)"
 
 mkdir -p "$B/pkgcache"
 CONF=$B/pacman.conf
-sed -e "s|@MIRROR@|$MIRROR|g" -e "s|@GPG@|$B/gnupg|" -e "s|@CACHE@|$B/pkgcache/|" -e "s|@REPO@|$TOP/repo|" profile/pacman.conf > "$CONF"
+sed -e "s|@MIRROR@|$MIRROR|g" -e "s|@GPG@|$B/gnupg|" -e "s|@CACHE@|$B/pkgcache/|" -e "s|@REPO@|$REPO|" profile/pacman.conf > "$CONF"
 
 echo "==> AUR packages (MaXX desktop and friends)"
-build/aur.sh "$CONF" "$MIRROR"
+B="$B" REPO="$REPO" bash "$TOP/build/aur.sh" "$CONF" "$MIRROR"
 
 echo "==> ISO"
 WORK=/var/tmp/porygon-work
@@ -39,7 +44,10 @@ rm -rf "$WORK"
 P=$(mktemp -d)
 cp -a profile/. "$P/"
 cp "$CONF" "$P/pacman.conf"
-mkarchiso -v -r -w "$WORK" -o "$TOP/out" "$P"
+rm -rf "$B/out"
+mkarchiso -v -r -w "$WORK" -o "$B/out" "$P"
 rm -rf "$P"
-[ -n "${SUDO_UID:-}" ] && chown -R "$SUDO_UID:$SUDO_GID" out repo aur
-echo "==> Done: $(ls -t out/*.iso | head -1)"
+ISO=$(ls -t "$B"/out/*.iso | head -1)
+cp "$ISO" "$TOP/out/"
+[ -n "${SUDO_UID:-}" ] && chown -R "$SUDO_UID:$SUDO_GID" "$TOP/out" 2>/dev/null || true
+echo "==> Done: $TOP/out/$(basename "$ISO")"
