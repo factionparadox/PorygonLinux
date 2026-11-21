@@ -76,7 +76,7 @@ python3 "$TOP/art/logo-assets.py" "$LOGO" "$P" "$TOP/art/fastfetch.png"
 # your own things from other Porygon-like projects: Porygon-Z's model (an Ollama
 # models folder), music and ambience. Looked for in PorygonLinux/local first, then
 # in your DreamOS clone's local/ folder. Never in git.
-UHOME=$(getent passwd "${SUDO_USER:-root}" | cut -d: -f6)
+UHOME=$(getent passwd "${SUDO_USER:-$(stat -c %U "$TOP")}" | cut -d: -f6)   # whoever owns the checkout, when run as root directly
 for x in felix-models music ambience; do
     for d in "$TOP/local" "$UHOME/DreamOS/local" "$UHOME/dreamos/local"; do
         [ -d "$d/$x" ] || continue
