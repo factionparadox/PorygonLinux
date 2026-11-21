@@ -22,7 +22,8 @@ British English and Russian, offline dictionaries) and an offline Russian course
   compression), with Snapper taking a snapshot before and after every update
 - **Boot menu:** Limine, themed with the Porygon backdrop. Every snapshot is in
   the menu with the kernel it had (limine-snapper-sync); booting one is safe to
-  try, and Porygon offers to keep it. Two kernels: `linux72` and the `linux618` LTS
+  try, and Porygon offers to keep it. Kernel: `linux72` (Manjaro no longer
+  ships 7.1)
 - **Laptop bits:** NetworkManager (`nmtui`), PipeWire, power-profiles-daemon,
   thermald, tap-to-click, brightness and volume keys
 - **Apps:** Firefox, pamac (Add/Remove Software), qmmp, mpv, Kiwix, xpdf, pavucontrol, fastfetch
@@ -102,8 +103,10 @@ inside a clean Manjaro chroot (`gtk2` takes the longest); later builds reuse the
 ## Use
 
 - The live USB logs in as `porygon` and starts the desktop.
-- To install: open a terminal and run `porygon-install`. It's UEFI-only and
-  erases the disk you pick by number: 2 GiB EFI partition (Limine and the
+- To install: double-click Install Porygon on the desktop (or Toolchest →
+  Porygon → Install Porygon). Porygon Setup is a 1990s-style wizard: disk,
+  user, region, a summary, then a progress bar. `sudo porygon-install` does the
+  same in a terminal. It's UEFI-only and erases the disk you choose: 2 GiB EFI partition (Limine and the
   kernels, including one per snapshot), the rest Btrfs.
 - Wi-Fi: `nmtui` in a terminal.
 

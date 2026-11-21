@@ -110,7 +110,7 @@ Menu Porygon
 	separator		f.separator
 	"Network Setup"		f.exec "$W nmtui"
 MENU
-    [ -n "$live" ] && printf '\t"Install Porygon"\tf.exec "%s bash -c '"'"'sudo porygon-install; read -n1 -rsp Done.'"'"'"\n' "$W"
+    [ -n "$live" ] && printf '\t"Install Porygon"\tf.exec "porygon-installer"\n'
     cat <<MENU
 	separator		f.separator
 	"Porygon Colours"	f.exec "porygon-theme on"
@@ -211,10 +211,14 @@ GI=$HOME/.config/rox.sourceforge.net/ROX-Filer/globicons
 if [ -f "$PB" ] && ! grep -q porygon-welcome "$PB"; then
     sed -i 's|</pinboard>|  <icon x="224" y="32" label="Welcome">/usr/local/bin/porygon-welcome</icon>\n  <icon x="224" y="160" label="Demos">/usr/local/bin/porygon-demos-folder</icon>\n  <icon x="224" y="288" label="Whats New">/usr/local/bin/porygon-evolved</icon>\n</pinboard>|' "$PB"
 fi
+# on the live USB: an Install Porygon icon
+if [ -d /run/archiso ] && [ -f "$PB" ] && ! grep -q porygon-installer "$PB"; then
+    sed -i 's|</pinboard>|  <icon x="352" y="32" label="Install Porygon">/usr/local/bin/porygon-installer</icon>\n</pinboard>|' "$PB"
+fi
 WICON=$SHARE/icons/welcome-128.png
 [ -f "$SHARE/icons/logo-128.png" ] && WICON=$SHARE/icons/logo-128.png   # the distro logo, if built in
 if [ -f "$GI" ] && ! grep -q porygon-welcome "$GI"; then
-    sed -i "s|</special-files>|  <rule match=\"/usr/local/bin/porygon-welcome\">\n    <icon>$WICON</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-demos-folder\">\n    <icon>$SHARE/icons/demos-128.png</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-evolved\">\n    <icon>$SHARE/icons/evolve-128.png</icon>\n  </rule>\n</special-files>|" "$GI"
+    sed -i "s|</special-files>|  <rule match=\"/usr/local/bin/porygon-welcome\">\n    <icon>$WICON</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-demos-folder\">\n    <icon>$SHARE/icons/demos-128.png</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-installer\">\n    <icon>$WICON</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-evolved\">\n    <icon>$SHARE/icons/evolve-128.png</icon>\n  </rule>\n</special-files>|" "$GI"
 fi
 
 # (Firefox gets its 1990s look from /usr/lib/firefox/browser/defaults/profile,

@@ -71,13 +71,13 @@ PAGES = [
         "your network and type the password.",
     ], [("Open Network Setup", lambda: term("nmtui", hold=False))]),
     ("install", "Install", "Install Porygon", [
-        "You're running Porygon from the USB stick. The installer copies this "
-        "system onto a disk you choose by number.",
+        "You're running Porygon from the USB stick. Porygon Setup copies this "
+        "system onto a disk you choose, asking a few questions on the way.",
         "",
         "It ERASES that whole disk, and it needs the USB to have been started "
         "in UEFI mode. When it's done, remove the USB and reboot - you'll land "
         "straight back in this desktop.",
-    ], [("Run the Installer", lambda: term("sudo", "porygon-install"))]),
+    ], [("Run the Installer", lambda: run("porygon-installer"))]),
     ("software", "Software", "Software Manager", [
         "Add/Remove Software (Manjaro's pamac) is the point-and-click way to "
         "find, install and update programs.",

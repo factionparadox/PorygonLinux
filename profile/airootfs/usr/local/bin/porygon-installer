@@ -1,0 +1,370 @@
+#!/usr/bin/env python3
+"""Porygon Setup - the graphical installer.
+
+A setup wizard in the manner of the 1990s ones (banner down the left on the
+first and last pages, a header band on the rest, < Back / Next > / Cancel),
+in Porygon's colours. It asks the questions, then runs
+`porygon-install --batch`, which does the work, and shows its progress.
+"""
+import os, queue, re, subprocess, threading, tkinter as tk
+from tkinter import ttk, messagebox
+
+SHARE = "/usr/local/share/porygon/installer"
+BG, PANEL, FIELD, WHITE = "#d9d3dd", "#c3bccb", "#f0c4d0", "#fbf8fc"
+PINK, PINK_DARK, BLUE, BLUE_DARK, INK, RED = "#ec849d", "#b04a68", "#5496ce", "#265284", "#1a1020", "#b02030"
+FONT, FONT_B = ("Helvetica", 10), ("Helvetica", 10, "bold")
+TITLE, HEAD = ("Helvetica", 16, "bold"), ("Helvetica", 11, "bold")
+W, H = 620, 440
+
+
+def layouts():
+    """Keyboard layouts from XKB, gb first."""
+    out = []
+    try:
+        on = False
+        for line in open("/usr/share/X11/xkb/rules/base.lst"):
+            if line.startswith("! layout"):
+                on = True; continue
+            if on and line.startswith("!"):
+                break
+            if on and line.strip():
+                code, name = line.split(None, 1)
+                out.append(f"{code} - {name.strip()}")
+    except OSError:
+        out = ["gb - English (UK)", "us - English (US)"]
+    out.sort(key=lambda s: (not s.startswith("gb "), s))
+    return out
+
+
+def zones():
+    base = "/usr/share/zoneinfo"
+    out = []
+    for region in ("Africa", "America", "Antarctica", "Asia", "Atlantic", "Australia", "Europe", "Indian", "Pacific"):
+        for root, _, files in os.walk(os.path.join(base, region)):
+            out += [os.path.relpath(os.path.join(root, f), base) for f in files]
+    return sorted(out) + ["UTC"]
+
+
+def disks():
+    r = subprocess.run(["sudo", "-n", "/usr/local/bin/porygon-install", "--list-disks"], capture_output=True, text=True)
+    return [l.split("\t") for l in r.stdout.splitlines() if l.strip()]
+
+
+class Wizard:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Porygon Setup")
+        self.root.configure(bg=BG)
+        self.root.resizable(False, False)
+        x = (self.root.winfo_screenwidth() - W) // 2
+        y = (self.root.winfo_screenheight() - H) // 2
+        self.root.geometry(f"{W}x{H}+{x}+{y}")
+        self.root.option_add("*Font", FONT)
+        self.root.protocol("WM_DELETE_WINDOW", self.cancel)
+        style = ttk.Style(); style.theme_use("clam")
+        style.configure("P.Horizontal.TProgressbar", troughcolor=WHITE, background=PINK,
+                        bordercolor=PINK_DARK, lightcolor=FIELD, darkcolor=PINK_DARK, thickness=18)
+        style.configure("TCombobox", fieldbackground=WHITE, background=PANEL, arrowcolor=INK)
+        try:
+            self.banner = tk.PhotoImage(file=f"{SHARE}/banner.png")
+            self.icon = tk.PhotoImage(file=f"{SHARE}/header.png")
+        except tk.TclError:
+            self.banner = self.icon = None
+
+        self.disk = tk.StringVar(); self.user = tk.StringVar(); self.pw1 = tk.StringVar()
+        self.pw2 = tk.StringVar(); self.host = tk.StringVar(value="porygon")
+        tz = os.path.realpath("/etc/localtime").split("zoneinfo/")[-1]
+        self.tz = tk.StringVar(value="Europe/London" if tz in ("UTC", "Etc/UTC", "/etc/localtime") else tz)
+        self.kb = tk.StringVar(value="gb - English (UK)")
+        self.agree = tk.IntVar(); self.reboot = tk.IntVar(value=1)
+        self.ok = False
+
+        self.body = tk.Frame(self.root, bg=BG)
+        self.body.place(x=0, y=0, width=W, height=H - 50)
+        tk.Frame(self.root, bg="#8f8798", height=1).place(x=0, y=H - 50, width=W)
+        tk.Frame(self.root, bg=WHITE, height=1).place(x=0, y=H - 49, width=W)
+        bar = tk.Frame(self.root, bg=BG)
+        bar.place(x=0, y=H - 46, width=W, height=46)
+        mk = lambda t, c: tk.Button(bar, text=t, command=c, width=9, bg=PANEL, activebackground=FIELD,
+                                    bd=2, relief="raised", font=FONT)
+        self.cancel_b = mk("Cancel", self.cancel); self.cancel_b.pack(side="right", padx=(6, 12), pady=8)
+        self.next_b = mk("Next >", self.next); self.next_b.pack(side="right", pady=8)
+        self.back_b = mk("< Back", self.back); self.back_b.pack(side="right", pady=8)
+
+        # the keys setup wizards always had: Enter = Next, Esc = Cancel, Alt+B / Alt+N
+        self.root.bind("<Return>", lambda e: self.next_b["state"] == "normal" and self.next())
+        self.root.bind("<Escape>", lambda e: self.cancel_b["state"] == "normal" and self.cancel())
+        self.root.bind("<Alt-b>", lambda e: self.back_b["state"] == "normal" and self.back())
+        self.root.bind("<Alt-n>", lambda e: self.next_b["state"] == "normal" and self.next())
+        self.back_b.configure(underline=2); self.next_b.configure(underline=0)
+        self.pages = [self.p_welcome, self.p_disk, self.p_user, self.p_region, self.p_ready,
+                      self.p_install, self.p_finish]
+        self.i = 0
+        self.show()
+
+    # --- page frames ------------------------------------------------------
+    def clear(self):
+        for w in self.body.winfo_children():
+            w.destroy()
+
+    def exterior(self, title, text):
+        """First/last page: banner down the left, white page on the right."""
+        self.clear()
+        f = tk.Frame(self.body, bg=WHITE); f.pack(fill="both", expand=True)
+        if self.banner:
+            tk.Label(f, image=self.banner, bd=0).pack(side="left", fill="y")
+        else:
+            tk.Frame(f, bg=PINK, width=164).pack(side="left", fill="y")
+        r = tk.Frame(f, bg=WHITE); r.pack(side="left", fill="both", expand=True, padx=20, pady=18)
+        tk.Label(r, text=title, font=TITLE, fg=BLUE_DARK, bg=WHITE, justify="left", wraplength=400, anchor="w").pack(fill="x")
+        tk.Label(r, text=text, bg=WHITE, fg=INK, justify="left", wraplength=400, anchor="w").pack(fill="x", pady=(16, 0))
+        return r
+
+    def interior(self, title, sub):
+        """Other pages: a header band with title, subtitle and icon."""
+        self.clear()
+        head = tk.Frame(self.body, bg=WHITE, height=64); head.pack(fill="x"); head.pack_propagate(False)
+        if self.icon:
+            tk.Label(head, image=self.icon, bg=WHITE).pack(side="right", padx=12)
+        t = tk.Frame(head, bg=WHITE); t.pack(side="left", fill="both", expand=True, padx=(20, 0), pady=10)
+        tk.Label(t, text=title, font=HEAD, bg=WHITE, fg=INK, anchor="w").pack(fill="x")
+        tk.Label(t, text=sub, bg=WHITE, fg=INK, anchor="w").pack(fill="x", padx=(16, 0))
+        tk.Frame(self.body, bg=PINK, height=2).pack(fill="x")
+        tk.Frame(self.body, bg=WHITE, height=1).pack(fill="x")
+        f = tk.Frame(self.body, bg=BG); f.pack(fill="both", expand=True, padx=36, pady=14)
+        return f
+
+    def buttons(self, back=True, nxt="Next >", cancel=True, nxt_on=True):
+        self.back_b.configure(state="normal" if back else "disabled")
+        self.next_b.configure(text=nxt, state="normal" if nxt_on else "disabled")
+        self.cancel_b.configure(state="normal" if cancel else "disabled")
+
+    # --- pages ------------------------------------------------------------
+    def p_welcome(self):
+        self.exterior("Welcome to the Porygon Setup Wizard",
+                      "This wizard installs Porygon on this computer: a 1990s workstation, "
+                      "rendered in polygons.\n\n"
+                      "It will erase the disk you choose and put Porygon on it, with your "
+                      "files kept apart from the system and a snapshot taken before every "
+                      "update, so an update can always be undone from the boot menu.\n\n"
+                      "Plug the computer in before you start. Setup takes a while.\n\n"
+                      "Click Next to continue.")
+        self.buttons(back=False)
+
+    def p_disk(self):
+        f = self.interior("Destination Disk", "Choose the disk Porygon will be installed on.")
+        tk.Label(f, text="Everything on the disk you choose will be erased.", bg=BG, fg=RED, font=FONT_B, anchor="w").pack(fill="x")
+        box = tk.Frame(f, bg=BG, bd=2, relief="sunken"); box.pack(fill="both", expand=True, pady=10)
+        lb = tk.Listbox(box, bg=WHITE, fg=INK, selectbackground=PINK, selectforeground=INK, bd=0,
+                        highlightthickness=0, font=("Courier", 11), activestyle="none")
+        lb.pack(fill="both", expand=True)
+        self.disk_list = disks()
+        for d in self.disk_list:
+            lb.insert("end", f"  {d[0]:<16}{d[1]:>9}   {d[2] if len(d) > 2 else ''}")
+        if not self.disk_list:
+            lb.insert("end", "  No disks found.")
+        for n, d in enumerate(self.disk_list):
+            if d[0] == self.disk.get():
+                lb.selection_set(n)
+
+        def pick(_=None):
+            sel = lb.curselection()
+            if sel and self.disk_list:
+                self.disk.set(self.disk_list[sel[0]][0])
+            self.buttons(nxt_on=bool(self.disk.get()))
+        lb.bind("<<ListboxSelect>>", pick)
+        lb.focus_set()
+        if not lb.curselection() and self.disk_list:
+            lb.selection_set(0); lb.activate(0); pick()
+        tk.Label(f, text="Porygon uses the whole disk: a 2 GB boot partition and the rest for the system.",
+                 bg=BG, fg=INK, anchor="w", wraplength=520, justify="left").pack(fill="x")
+        self.buttons(nxt_on=bool(self.disk.get()))
+
+    def p_user(self):
+        f = self.interior("User Information", "Your account and this computer's name.")
+        rows = [("Username:", self.user, ""), ("Password:", self.pw1, "*"),
+                ("Confirm password:", self.pw2, "*"), ("Computer name:", self.host, "")]
+        for n, (lab, var, show) in enumerate(rows):
+            tk.Label(f, text=lab, bg=BG, anchor="w").grid(row=n, column=0, sticky="w", pady=6)
+            e = tk.Entry(f, textvariable=var, show=show, width=30, bg=WHITE, bd=2, relief="sunken")
+            e.grid(row=n, column=1, sticky="w", padx=12)
+            if n == 0:
+                e.focus_set()
+        self.user_msg = tk.Label(f, text="Usernames are lowercase letters, numbers, - and _.", bg=BG, fg=INK, anchor="w")
+        self.user_msg.grid(row=4, column=0, columnspan=2, sticky="w", pady=(14, 0))
+        self.buttons()
+
+    def p_region(self):
+        f = self.interior("Region", "Time zone and keyboard.")
+        tk.Label(f, text="Time zone:", bg=BG, anchor="w").grid(row=0, column=0, sticky="w", pady=8)
+        ttk.Combobox(f, textvariable=self.tz, values=zones(), width=36, state="readonly").grid(row=0, column=1, padx=12, sticky="w")
+        tk.Label(f, text="Keyboard layout:", bg=BG, anchor="w").grid(row=1, column=0, sticky="w", pady=8)
+        kb = ttk.Combobox(f, textvariable=self.kb, values=layouts(), width=36, state="readonly")
+        kb.grid(row=1, column=1, padx=12, sticky="w")
+        # switch this session to the chosen layout, so the test box below uses it
+        kb.bind("<<ComboboxSelected>>", lambda _: subprocess.run(["setxkbmap", self.kb.get().split()[0]]))
+        tk.Label(f, text="Type here to try the keyboard:", bg=BG, anchor="w").grid(row=2, column=0, columnspan=2, sticky="w", pady=(18, 4))
+        tk.Entry(f, width=44, bg=WHITE, bd=2, relief="sunken").grid(row=3, column=0, columnspan=2, sticky="w")
+        self.buttons()
+
+    def p_ready(self):
+        f = self.interior("Ready to Install", "Setup has everything it needs.")
+        size = next((d[1] for d in self.disk_list if d[0] == self.disk.get()), "")
+        summary = (f"Disk:\t\t{self.disk.get()} ({size})\nUsername:\t{self.user.get()}\n"
+                   f"Computer name:\t{self.host.get()}\nTime zone:\t{self.tz.get()}\n"
+                   f"Keyboard:\t{self.kb.get()}")
+        box = tk.Label(f, text=summary, bg=WHITE, fg=INK, justify="left", anchor="nw", bd=2,
+                       relief="sunken", padx=10, pady=8, font=("Courier", 10))
+        box.pack(fill="x")
+        cb = tk.Checkbutton(f, text=f"Erase everything on {self.disk.get()} and install Porygon",
+                       variable=self.agree, bg=BG, activebackground=BG, selectcolor=WHITE, fg=RED,
+                       font=FONT_B, command=lambda: self.buttons(nxt="Install", nxt_on=bool(self.agree.get()))
+                       )
+        cb.pack(anchor="w", pady=(16, 4)); cb.focus_set()
+        # Tk lets Enter tick a checkbox; here Enter means Install, as everywhere else
+        cb.bind("<Return>", lambda e: (self.next_b["state"] == "normal" and self.next(), "break")[1])
+        tk.Label(f, text="Click Install to begin, or Back to change something.", bg=BG, anchor="w").pack(fill="x")
+        self.buttons(nxt="Install", nxt_on=bool(self.agree.get()))
+
+    def p_install(self):
+        f = self.interior("Installing Porygon", "Please wait while Setup installs Porygon. This takes a while.")
+        self.status = tk.Label(f, text="Starting...", bg=BG, anchor="w"); self.status.pack(fill="x")
+        self.bar = ttk.Progressbar(f, style="P.Horizontal.TProgressbar", maximum=100, length=540)
+        self.bar.pack(fill="x", pady=(6, 12))
+        self.pct = tk.Label(f, text="0%", bg=BG, anchor="e"); self.pct.pack(fill="x")
+        lf = tk.Frame(f, bg=BG, bd=2, relief="sunken"); lf.pack(fill="both", expand=True, pady=(8, 0))
+        self.log = tk.Text(lf, height=8, bg=WHITE, fg=INK, bd=0, font=("Courier", 9), wrap="word")
+        self.log.pack(fill="both", expand=True)
+        self.buttons(back=False, nxt_on=False, cancel=False)
+        self.run()
+
+    def p_finish(self):
+        if self.ok:
+            r = self.exterior("Completing the Porygon Setup Wizard",
+                              "Porygon is installed.\n\nRemove the USB stick, then restart. "
+                              "You'll start straight into the desktop.\n\n"
+                              "Click Finish to close this wizard.")
+            tk.Checkbutton(r, text="Restart now", variable=self.reboot, bg=WHITE, activebackground=WHITE,
+                           selectcolor=WHITE).pack(anchor="w", pady=(20, 0))
+        else:
+            self.exterior("Setup Did Not Finish",
+                          f"Porygon couldn't be installed:\n\n{self.error or 'an unexpected error.'}\n\n"
+                          "Nothing on this USB stick was changed. The terminal installer "
+                          "(sudo porygon-install) shows every step if you want to look closer.")
+        self.buttons(back=False, nxt="Finish", cancel=False)
+
+    # --- the install ------------------------------------------------------
+    def run(self):
+        # keep the screen awake while it works (the progress is the point)
+        for c in (["xset", "s", "off", "-dpms"], ["xscreensaver-command", "-exit"]):
+            subprocess.run(c, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        env = dict(os.environ, DISK=self.disk.get(), USERNAME=self.user.get(),
+                   HOST=self.host.get() or "porygon", TZONE=self.tz.get(), KB=self.kb.get().split()[0])
+        cmd = ["sudo", "-n", "--preserve-env=DISK,USERNAME,HOST,TZONE,KB", "/usr/local/bin/porygon-install", "--batch"]
+        self.proc = subprocess.Popen(cmd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT)
+        self.proc.stdin.write((self.pw1.get() + "\n").encode()); self.proc.stdin.close()
+        self.q, self.error, self.stage = queue.Queue(), None, 0
+        threading.Thread(target=self.reader, daemon=True).start()
+        self.root.after(150, self.poll)
+
+    def reader(self):
+        buf = b""
+        while True:
+            c = self.proc.stdout.read(1)
+            if not c:
+                break
+            if c in (b"\n", b"\r"):
+                self.q.put(buf.decode(errors="replace")); buf = b""
+            else:
+                buf += c
+        self.q.put(None)
+
+    def poll(self):
+        try:
+            while True:
+                line = self.q.get_nowait()
+                if line is None:
+                    self.done(); return
+                self.handle(line)
+        except queue.Empty:
+            pass
+        self.root.after(150, self.poll)
+
+    def set(self, pct):
+        pct = max(self.bar["value"], min(100, pct))
+        self.bar["value"] = pct; self.pct.configure(text=f"{int(pct)}%")
+
+    def note(self, text):
+        self.log.configure(state="normal"); self.log.insert("end", text + "\n")
+        self.log.configure(state="disabled"); self.log.see("end")
+
+    def handle(self, line):
+        line = re.sub(r"\x1b\[[0-9;]*m", "", line).rstrip()
+        if not line:
+            return
+        if line.startswith("@@ "):
+            _, pct, text = line.split(" ", 2)
+            self.stage = int(pct) if int(pct) else self.stage
+            if int(pct):
+                self.set(int(pct))
+            self.status.configure(text=text)
+            self.note(text)
+        elif line.startswith("!! "):
+            self.error = line[3:]
+            self.note(line)
+        else:
+            m = re.search(r"\s(\d+)%\s", line)
+            if m and self.stage == 8:                   # rsync copying the system
+                self.set(8 + int(m.group(1)) * 0.6)
+                return
+            self.note(line)
+        self.log.see("end")
+
+    def done(self):
+        rc = self.proc.wait()
+        self.ok = rc == 0 and not self.error
+        if self.ok:
+            self.set(100)
+        elif not self.error:
+            self.error = f"the installer stopped (exit code {rc})."
+        self.i += 1; self.show()
+
+    # --- navigation -------------------------------------------------------
+    def check(self):
+        page = self.pages[self.i]
+        if page == self.p_user:
+            if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", self.user.get()):
+                messagebox.showwarning("Porygon Setup", "Usernames are lowercase letters, numbers, - and _, starting with a letter."); return False
+            if not self.pw1.get() or self.pw1.get() != self.pw2.get():
+                messagebox.showwarning("Porygon Setup", "The passwords are empty or don't match."); return False
+            if not re.fullmatch(r"[A-Za-z0-9-]{1,63}", self.host.get() or "porygon"):
+                messagebox.showwarning("Porygon Setup", "Computer names are letters, numbers and -."); return False
+        return True
+
+    def show(self):
+        self.pages[self.i]()
+
+    def next(self):
+        if self.pages[self.i] == self.p_finish:
+            self.root.destroy()
+            if self.ok and self.reboot.get():
+                subprocess.run(["systemctl", "reboot"])
+            return
+        if self.check():
+            self.i += 1; self.show()
+
+    def back(self):
+        if self.i > 0:
+            self.i -= 1; self.show()
+
+    def cancel(self):
+        if self.pages[self.i] in (self.p_install,):
+            return
+        if self.pages[self.i] == self.p_finish or messagebox.askyesno(
+                "Exit Setup", "Setup is not complete. If you exit now, Porygon will not be installed.\n\nExit Setup?"):
+            self.root.destroy()
+
+
+if __name__ == "__main__":
+    Wizard().root.mainloop()

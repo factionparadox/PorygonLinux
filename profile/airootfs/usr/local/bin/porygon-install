@@ -3,24 +3,43 @@
 # Wipes the chosen disk: 2 GiB EFI partition (Limine, kernels, a kernel per
 # snapshot) + Btrfs root in subvolumes, with Snapper taking a snapshot before
 # every update and each snapshot bootable from the Limine menu.
+#
+#   porygon-install              ask in the terminal
+#   porygon-install --list-disks the disks it can install to (for the wizard)
+#   porygon-install --batch      no questions: DISK USERNAME HOST TZONE KB from
+#                                the environment, the password on stdin; prints
+#                                "@@ STEP percent text" lines for porygon-installer
 set -euo pipefail
 [ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+MODE=ask; case ${1:-} in --batch) MODE=batch ;; --list-disks) MODE=list ;; esac
 
 B='\e[1;38;2;120;160;210m'; N='\e[0m'
-say() { printf "${B}::${N} %s\n" "$*"; }
-die() { printf '\e[1;31m!!\e[0m %s\n' "$*"; exit 1; }
+STEP=0
+say() { STEP=$((STEP + 1)); if [ $MODE = batch ]; then echo "@@ ${STEP_PCT:-0} $*"; else printf "${B}::${N} %s\n" "$*"; fi; }
+die() { if [ $MODE = batch ]; then echo "!! $*"; else printf '\e[1;31m!!\e[0m %s\n' "$*"; fi; exit 1; }
 
 [ -d /sys/firmware/efi ] || die "Porygon installs in UEFI mode only. Reboot the USB in UEFI mode."
 [ -d /run/archiso ] || die "Run this from the Porygon live USB."
 PKGS=/usr/share/porygon/pkgs        # the boot tools, installed only on the target
 
-clear
-printf "${B}PORYGON INSTALLER${N}\n\n"
-
-# --- disk, picked by number ---
 live_disk=$(lsblk -no PKNAME "$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null)" 2>/dev/null || true)
 mapfile -t disks < <(lsblk -dpno NAME,TYPE,RM | awk '$2=="disk"{print $1}' | grep -v -e '/dev/loop' -e '/dev/zram' -e '/dev/fd' ${live_disk:+-e "/dev/$live_disk\$"})
+if [ $MODE = list ]; then
+    for d in "${disks[@]}"; do printf '%s\t%s\t%s\n' "$d" "$(lsblk -dno SIZE "$d" | xargs)" "$(lsblk -dno MODEL "$d" | xargs)"; done
+    exit 0
+fi
 [ ${#disks[@]} -gt 0 ] || die "No disks found to install to."
+
+if [ $MODE = batch ]; then
+    : "${DISK:?}" "${USERNAME:?}" "${HOST:=porygon}" "${TZONE:=Europe/London}" "${KB:=gb}"
+    IFS= read -r PW1
+    printf '%s\n' "${disks[@]}" | grep -qx "$DISK" || die "$DISK isn't a disk Porygon can install to."
+    [[ $USERNAME =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "Usernames are lowercase letters, numbers, - and _."
+    [ -n "$PW1" ] || die "The password is empty."
+    [ -f "/usr/share/zoneinfo/$TZONE" ] || die "Unknown time zone '$TZONE'."
+else
+clear
+printf "${B}PORYGON INSTALLER${N}\n\n"
 say "Disks:"
 for i in "${!disks[@]}"; do
     d=${disks[$i]}
@@ -50,9 +69,10 @@ echo
 printf '\e[1;31m   EVERYTHING on %s (%s) will be erased.\e[0m\n' "$DISK" "$(lsblk -dno SIZE "$DISK" | xargs)"
 read -rp "   Type yes to continue: " ok
 [ "$ok" = yes ] || die "Cancelled - nothing was changed."
+fi
 
 # --- partition ---
-say "Partitioning $DISK"
+STEP_PCT=2 say "Partitioning $DISK"
 umount -R /mnt 2>/dev/null || true
 wipefs -af "$DISK" >/dev/null
 sgdisk -Z "$DISK" >/dev/null
@@ -77,13 +97,14 @@ mount --mkdir -t btrfs -o subvol=/@pkg,$OPTS "$ROOT" /mnt/var/cache/pacman/pkg
 mount --mkdir -t vfat -o umask=0077 "$ESP" /mnt/boot
 
 # --- copy the live system ---
-say "Copying the system (a few minutes)"
-rsync -aAXH --info=progress2 --no-inc-recursive \
+STEP_PCT=8 say "Copying the system (a few minutes)"
+RSYNC_PROGRESS=--info=progress2; [ $MODE = batch ] && RSYNC_PROGRESS="--info=progress2 --outbuf=L"
+rsync -aAXH $RSYNC_PROGRESS --no-inc-recursive \
     --exclude={/dev/*,/proc/*,/sys/*,/run/*,/tmp/*,/mnt/*,/boot/*,/home/*,/var/cache/pacman/pkg/*,/var/log/*,/etc/machine-id,/etc/pacman.d/gnupg/*} \
     / /mnt/
 
 # --- undo the live-USB bits ---
-say "Configuring"
+STEP_PCT=70 say "Configuring"
 rm -f /mnt/etc/mkinitcpio.conf.d/archiso.conf \
       /mnt/etc/systemd/system/getty@tty1.service.d/autologin.conf \
       /mnt/etc/systemd/system/{pacman-init,livecd-alsa-unmuter}.service \
@@ -140,13 +161,13 @@ printf '%s:%s\n' "$USERNAME" "$PW1" | arch-chroot /mnt chpasswd
 
 # --- drivers: Manjaro's hardware detection picks the graphics driver ---
 if ping -c1 -W3 mirror.init7.net >/dev/null 2>&1; then
-    say "Choosing graphics drivers"
+    STEP_PCT=74 say "Choosing graphics drivers"
     arch-chroot /mnt /bin/bash -c 'pacman -Sy >/dev/null 2>&1; mhwd -a pci nonfree 0300 --noconfirm' >/dev/null 2>&1 ||
         say "Driver detection didn't finish; the open-source drivers stay (run 'sudo mhwd -a pci nonfree 0300' later)."
 fi
 
 # --- boot: Limine with Porygon's theme, kernels on the EFI partition ---
-say "Setting up the boot menu and snapshots"
+STEP_PCT=80 say "Setting up the boot menu and snapshots"
 UUID=$(blkid -s UUID -o value "$ROOT")
 cat > /mnt/etc/mkinitcpio.conf.d/porygon.conf <<'HOOKS'
 # Porygon: boot splash early; btrfs-overlayfs lets a read-only snapshot boot
@@ -159,8 +180,8 @@ TARGET_OS_NAME="Porygon"
 ESP_PATH="/boot"
 KERNEL_CMDLINE[default]="root=UUID=$UUID rootflags=subvol=/@ rw quiet splash loglevel=3"
 ENABLE_LIMINE_FALLBACK=yes
-# the main kernel first (it's the default), then the LTS, then snapshots
-BOOT_ORDER="linux72*, *, *fallback, Snapshots"
+# the kernel first (it's the default), then the snapshots
+BOOT_ORDER="*, *fallback, Snapshots"
 FIND_BOOTLOADERS=no
 MAX_SNAPSHOT_ENTRIES=8
 LIMINE
@@ -176,7 +197,7 @@ mkdir -p /mnt/var/cache/porygon-pkgs; cp $PKGS/*.pkg.tar.zst /mnt/var/cache/pory
 arch-chroot /mnt /bin/bash -e <<'BOOT'
 pacman -Rdd --noconfirm grub >/dev/null 2>&1 || true
 rm -f /etc/default/grub
-pacman -U --noconfirm --needed /var/cache/porygon-pkgs/*.pkg.tar.zst >/dev/null
+pacman -U --noconfirm --needed /var/cache/porygon-pkgs/*.pkg.tar.zst >/tmp/pacman-u.log 2>&1 || { cat /tmp/pacman-u.log; exit 1; }
 rm -rf /var/cache/porygon-pkgs
 limine-install >/dev/null
 limine-mkinitcpio >/dev/null 2>&1
@@ -192,4 +213,4 @@ grep -q 'protocol: linux' /mnt/boot/limine.conf || die "Couldn't set up the boot
 
 sync
 umount -R /mnt
-say "Done. Remove the USB and reboot - you'll land straight in the desktop."
+STEP_PCT=100 say "Done. Remove the USB and reboot - you'll land straight in the desktop."

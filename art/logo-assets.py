@@ -108,6 +108,27 @@ terminal-font: "Unifont Regular 16"
 """)
 grub_theme(os.path.join(prof, "grub/themes/porygon"))
 
+# Install wizard: the tall banner on its first and last pages, in the manner
+# of a 1990s setup wizard (164x390 at 1x, the page height; made at 2x)
+def wizard_banner(W=328, H=780):
+    tmp = "/tmp/_wiz_bd.png"
+    subprocess.run([sys.executable, os.path.join(here, "wallpaper.py"), tmp, str(W), str(H), "5"], check=True)
+    img = Image.open(tmp).convert("RGBA")
+    L = fit(logo, int(W * 0.86), pad=0)
+    x, y = (W - L.width) // 2, int(H * 0.56)
+    m = Image.new("L", img.size, 0); m.paste(L.getchannel("A"), (x + 6, y + 6))
+    sh = Image.new("RGBA", img.size, (0, 0, 0, 0)); sh.putalpha(m.filter(ImageFilter.GaussianBlur(8)).point(lambda v: int(v * .45)))
+    img.alpha_composite(sh); img.alpha_composite(L, (x, y))
+    d = ImageDraw.Draw(img)
+    big = font("DejaVuSerif-Bold.ttf", 46); small = font("DejaVuSans-Oblique.ttf", 22)
+    for off, col in ((3, NIGHT), (0, WHITE)):
+        d.text((24 + off, 40 + off), "PORYGON", font=big, fill=col)
+    d.text((26, 100), "Setup", font=small, fill=PINK_LIGHT)
+    return img
+os.makedirs(os.path.join(share, "installer"), exist_ok=True)
+wizard_banner().resize((164, 390), Image.LANCZOS).convert("RGB").save(os.path.join(share, "installer", "banner.png"))
+fit(logo, 48).save(os.path.join(share, "installer", "header.png"))
+
 # Limine (the installed system's boot menu): the backdrop without the title,
 # since Limine prints its branding line and the menu over the left side
 lim = os.path.join(prof, "airootfs/usr/share/porygon/limine")
