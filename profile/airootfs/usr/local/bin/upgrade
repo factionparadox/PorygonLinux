@@ -1,6 +1,5 @@
 #!/bin/bash
-# upgrade - Porygon's package tool (named for the item that evolves Porygon).
-# A thin coat of paint over Manjaro's pamac.
+# upgrade - install, remove and update software.
 #   upgrade                 update the system
 #   upgrade install PKG..   install packages, choosing where each comes
 #                           from: Manjaro stable, testing, unstable, or AUR
@@ -105,6 +104,7 @@ update_pinned() {
 }
 label() { case $1 in aur) echo "AUR (built here)" ;; *) echo "Manjaro $1 ($2)" ;; esac; }
 case $cmd in
+  pinned)         update_pinned ;;
   update|-u)      start=$(date +%Y-%m-%dT%H:%M:%S)
                   pamac upgrade && update_pinned && porygon-record-evolution upgrade "$start" ;;
   branches)       if [ ! -s "$PINS" ]; then echo "Nothing is pinned - everything follows Manjaro stable."; exit 0; fi
@@ -121,6 +121,6 @@ case $cmd in
   list|ls)        pamac list -e ;;
   clean)          pamac clean ;;
   mirrors)        sudo pacman-mirrors --fasttrack 10 && sudo pacman -Syy ;;
-  help|-h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//' ;;
+  help|-h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) echo "upgrade: unknown command '$cmd' (try: upgrade help)"; exit 1 ;;
 esac

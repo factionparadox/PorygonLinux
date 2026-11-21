@@ -37,7 +37,7 @@ def sub(m):
     if k not in OURS: return m.group(0)
     return "#define %s %s" % (k, OURS[k])
 out = "".join(re.sub(r"#define (\w+) (#[0-9a-fA-F]{6})", sub, p) for p in parts)
-out = re.sub(r"#define SchemeDescription .*", "#define SchemeDescription Porygon: pink and blue, rendered in polygons", out)
+out = re.sub(r"#define SchemeDescription .*", "#define SchemeDescription Porygon: pink and blue", out)
 os.makedirs(os.path.dirname(DST_SCHEME), exist_ok=True)
 open(DST_SCHEME, "w").write(out)
 

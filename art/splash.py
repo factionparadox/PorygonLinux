@@ -28,6 +28,6 @@ f = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 
 f2 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf", 15)
 for off, col in ((3, NIGHT), (0, WHITE)):
     d.text((44 + off, 74 + off), "PORYGON", font=f, fill=col)
-d.text((48, 140), "a 1990s workstation, rendered in polygons", font=f2, fill=PINK_LIGHT)
+d.text((48, 140), "Manjaro + MaXX Interactive Desktop", font=f2, fill=PINK_LIGHT)
 d.text((48, 160), "Manjaro edition", font=f2, fill=BLUE_LIGHT)
 img.save(sys.argv[1])

@@ -45,7 +45,7 @@ ZIMS = {   # key: (Kiwix directory, file prefix)
 PACKS = {
     'ru-voices': ('Russian voices for speech: Irina, Denis, Dmitri, Ruslan (Piper)', 0.25),
     'ai-tutor': ('AI Russian tutor: Qwen3 30B, runs on this computer (porygon-russian tutor)', 18.6),
-    'porygon-z': ('Porygon-Z, someone to talk to: Qwen3 4B, runs on this computer (porygon-z)', 4.3),
+    'porygon-z': ('Porygon-Z model: Qwen3 4B, runs locally (porygon-z)', 4.3),
     'ru-course': ('Courses: Между нами textbook with audio; FSI, DLI and Peace Corps books and audio', 1.2),
     'ru-dictionaries': ('Dictionaries: English and Russian Wiktionary (Kiwix)', 9.0),
     'ru-reading': ('Reading: Russian Wikisource (classics) and Wikipedia (introductions)', 6.0),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""porygon-z: someone to talk to. Runs on this computer only, through the local Ollama.
+"""porygon-z: chat with Porygon-Z, a language model running on this computer through the local Ollama.
 
     porygon-z                 talk to Porygon-Z
     porygon-z --journal       talk, and keep this conversation in your journal

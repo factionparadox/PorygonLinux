@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """porygon-nudge TITLE BODY [ID=Label ...]
 
-A small, gentle reminder window in the bottom-right corner. Prints the ID of
+A small reminder window in the bottom-right corner. Prints the ID of
 the button you press (nothing if you close it or ignore it). It never grabs
 the keyboard and it closes itself after three minutes.
 """

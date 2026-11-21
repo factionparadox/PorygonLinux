@@ -100,7 +100,7 @@ sed -i '/^porygon:/d' /mnt/etc/group /mnt/etc/gshadow
 sed -i 's/,porygon//; s/:porygon$/:/' /mnt/etc/group /mnt/etc/gshadow
 genfstab -U /mnt > /mnt/etc/fstab
 echo "$HOST" > /mnt/etc/hostname
-printf '\n  PORYGON  -  a 1990s workstation, rendered in polygons\n  upgrade: update the system    dubious-disc: update MaXX too\n  Manjaro edition: aged two weeks, like a fine cheese\n\n' > /mnt/etc/motd
+printf '\n  PORYGON\n  upgrade: update the system    dubious-disc: update MaXX too\n\n' > /mnt/etc/motd
 ln -sf "/usr/share/zoneinfo/$TZONE" /mnt/etc/localtime
 # the console names some layouts differently from X (gb on the desktop is uk here)
 case $KB in gb) CONSOLE_KB=uk ;; *) CONSOLE_KB=$KB ;; esac
