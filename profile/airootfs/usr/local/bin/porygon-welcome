@@ -53,18 +53,21 @@ def maxx_version():
 
 PAGES = [
     ("welcome", "Welcome", "Getting Started", [
+        "Porygon is a 1990s graphics workstation, rendered in polygons.",
+        "",
         "The desktop is the MaXX Interactive Desktop, a licensed recreation of "
         "the Indigo Magic desktop that shipped on SGI machines. The Toolchest "
         "(top left) is your menu: everything lives there, including Porygon's "
         "own menu and the Demos.",
         "",
         "A few things to try:",
-        "  •  Toolchest → Demos",
+        "  •  Toolchest → Demos, for the polygons",
         "  •  Double-click winterm on the desktop for a shell",
         "  •  Right-click the desktop for the background menu",
     ], [("Show the Toolchest's Demos", lambda: show("demos"))]),
     ("network", "Network", "Connect to Wi-Fi", [
-        "Network setup runs in a terminal (nmtui): pick “Activate a connection”, choose "
+        "Porygon uses NetworkManager. The network setup runs in a terminal "
+        "(it's 1996, after all): pick “Activate a connection”, choose "
         "your network and type the password.",
     ], [("Open Network Setup", lambda: term("nmtui", hold=False))]),
     ("install", "Install", "Install Porygon", [
@@ -86,15 +89,16 @@ PAGES = [
         "them back.",
         "",
         "  upgrade  —  update the system.",
-        "  dubious-disc  —  update the system, then rebuild MaXX and the "
-        "other AUR packages.",
+        "  dubious-disc  —  the full evolution: the system, then the MaXX "
+        "desktop and the other AUR parts.",
     ], [("Add/Remove Software", lambda: run("pamac-manager")),
         ("Update System", lambda: term("upgrade")),
         ("Testing/Unstable Programs", lambda: term("upgrade", "branches")),
         ("What's New", lambda: run("porygon-evolved"))]),
     ("demos", "Demos", "3D Demos", [
-        "SGI demos, xscreensaver hacks and Mesa demos. Each opens in its own "
-        "window; close it to stop.",
+        "SGI workstations were the polygon machines of the 1990s, and these "
+        "demos are why people stood around them in shops. Each one opens in "
+        "its own window; close it to stop.",
     ], [("Atlantis", lambda: run("porygon-demo", "atlantis")),
         ("Ideas in Motion", lambda: run("porygon-demo", "ideas")),
         ("Polyhedra", lambda: run("porygon-demo", "polyhedra")),
@@ -110,16 +114,18 @@ PAGES = [
     ], [("Desktop Settings", lambda: run("/opt/MaXX/bin/desktop")),
         ("Porygon Colours", lambda: run("porygon-theme", "on")),
         ("SGI Colours", lambda: run("porygon-theme", "off"))]),
-    ("calm", "Wellbeing", "Wellbeing", [
-        "  •  Night light: warmer screen from 20:00 to 07:00.",
-        "  •  Rest: a reminder after 50 minutes at the keyboard. Five minutes "
-        "idle resets the count.",
-        "  •  Bedtime: a reminder at 23:30, with rain and a sleep timer.",
+    ("calm", "Wellbeing", "A Healthier Computer", [
+        "Porygon tries to be good company rather than a slot machine.",
         "",
-        "Every reminder can be snoozed or dismissed.",
+        "  •  Night light: the screen warms up in the evening (20:00 to 07:00).",
+        "  •  Rest: after about 50 minutes at the keyboard, a small window "
+        "suggests resting your eyes. Five minutes away counts as a rest, so it "
+        "never nags twice. Every reminder can be snoozed or ignored; nothing "
+        "ever locks you out.",
+        "  •  Bedtime: one reminder at 23:30, with rain and a sleep timer.",
         "",
         "Toolchest → Calm has breathing, sounds, sleep timers and Porygon-Z, "
-        "a chat model that runs on this computer.",
+        "someone to talk to who runs entirely on this computer.",
     ], [("Breathe", lambda: run("porygon-wellbeing", "breathe")),
         ("Talk to Porygon-Z", lambda: term("porygon-z", hold=False)),
         ("Change Times", lambda: run("bash", "-c",
@@ -137,8 +143,8 @@ PAGES = [
         ("Tutor", lambda: term("porygon-russian", "tutor", hold=False)),
         ("Download Material", lambda: term("sudo", "porygon-content"))]),
     ("privacy", "Privacy", "What Talks to the Internet", [
-        "No accounts, telemetry or adverts. Everything that uses the network, "
-        "and when:",
+        "A computer that works for you: no accounts, no telemetry, no adverts. "
+        "This is everything on Porygon that uses the network, and when:",
         "",
         "  •  Updates (upgrade, pamac): Manjaro's mirrors and the AUR, when you "
         "run them, or when Add/Remove Software checks for updates.",

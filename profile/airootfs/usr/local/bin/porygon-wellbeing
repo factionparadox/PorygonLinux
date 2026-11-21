@@ -1,12 +1,13 @@
 #!/bin/bash
-# porygon-wellbeing: night light and rest/bedtime reminders.
-# Started at login by the Porygon session. Reminders are small windows that
-# can be answered, snoozed or ignored; none of them lock the screen.
+# porygon-wellbeing: Porygon's gentle reminders (ported from Dream OS to X11).
+# Started at login by the Porygon session. Nothing here ever locks you out:
+# every reminder is a small window you can answer, postpone or ignore.
 #
-#   - Night light: warmer colour temperature from NIGHT_FROM to NIGHT_TO.
-#   - Rest: a reminder after BREAK_EVERY minutes of activity; BREAK_AWAY minutes
-#     idle resets the count.
-#   - Bedtime: one reminder at BEDTIME, with rain and a sleep timer.
+#   - Night light: the screen turns warmer in the evening and back in the morning.
+#   - Rest: after a stretch at the computer, a quiet suggestion to rest your eyes.
+#     Being away from the keyboard for a few minutes counts as a rest, so it never
+#     nags after you've already had one.
+#   - Bedtime: one reminder at bedtime, with a button for rain and a sleep timer.
 #   - Breathe: the rest reminder can open the breathing window.
 #
 # Settings: ~/.config/porygon/wellbeing.conf (made on first start), or the
@@ -189,5 +190,5 @@ status)
   echo "rest:        every ${BREAK_EVERY} minutes (0 = off)"
   echo "settings:    $conf"
   ;;
-*) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+*) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
