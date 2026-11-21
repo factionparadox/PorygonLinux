@@ -139,6 +139,9 @@ for name in ("welcome", "demos", "evolve"):
         icons[name] = tk.PhotoImage(file=f"{SHARE}/icons/{name}-48.png")
     except tk.TclError:
         pass
+# the distro logo, when the ISO was built with one (art/logo.png)
+if os.path.exists(f"{SHARE}/icons/logo-48.png"):
+    icons["welcome"] = tk.PhotoImage(file=f"{SHARE}/icons/logo-48.png")
 ICON_FOR = {"welcome": "welcome", "demos": "demos", "software": "evolve", "install": "evolve"}
 
 # --- title strip: pink, like an active title bar ---

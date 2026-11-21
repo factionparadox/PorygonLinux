@@ -15,7 +15,7 @@ mkdir -p "$B" "$REPO" "$TOP/out"
 cp -u "$TOP"/repo/*.pkg.tar.zst "$REPO"/ 2>/dev/null || true   # the prebuilt packages
 
 echo "==> Build tools"
-pacman -S --needed --noconfirm archiso arch-install-scripts git >/dev/null 2>&1
+pacman -S --needed --noconfirm archiso arch-install-scripts git python-pillow ttf-dejavu >/dev/null 2>&1
 
 echo "==> Manjaro keyring (kept in $B, your own keyring isn't touched)"
 if [ ! -f "$B/gnupg/.populated" ]; then
@@ -44,6 +44,11 @@ rm -rf "$WORK"
 P=$(mktemp -d)
 cp -a profile/. "$P/"
 cp "$CONF" "$P/pacman.conf"
+# your logo (art/logo.png, kept out of git) -> icons, splash, fastfetch
+if [ -f "$TOP/art/logo.png" ]; then
+    echo "==> Using your logo"
+    python3 "$TOP/art/logo-assets.py" "$TOP/art/logo.png" "$P"
+fi
 rm -rf "$B/out"
 mkarchiso -v -r -w "$WORK" -o "$B/out" "$P"
 rm -rf "$P"
