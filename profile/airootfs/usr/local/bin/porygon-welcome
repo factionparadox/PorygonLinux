@@ -79,15 +79,21 @@ PAGES = [
         "straight back in this desktop.",
     ], [("Run the Installer", lambda: term("sudo", "porygon-install"))]),
     ("software", "Software", "Software Manager", [
-        "Two ways to evolve:",
+        "Add/Remove Software (Manjaro's pamac) is the point-and-click way to "
+        "find, install and update programs.",
         "",
-        "  upgrade  —  updates the system from Manjaro's repositories.",
+        "In a winterm, upgrade install NAME lets you choose where each program "
+        "comes from: Manjaro stable (the default), testing or unstable (newer, "
+        "less tried), or the AUR. A program you take from testing or unstable "
+        "stays there through updates; upgrade branches lists them and moves "
+        "them back.",
+        "",
+        "  upgrade  —  update the system.",
         "  dubious-disc  —  the full evolution: the system, then the MaXX "
-        "desktop and the other AUR parts if there are newer versions.",
-        "",
-        "Afterwards, Toolchest → Porygon → What's New shows what changed.",
-    ], [("Update System", lambda: term("upgrade")),
-        ("Full Evolution", lambda: term("dubious-disc")),
+        "desktop and the other AUR parts.",
+    ], [("Add/Remove Software", lambda: run("pamac-manager")),
+        ("Update System", lambda: term("upgrade")),
+        ("Testing/Unstable Programs", lambda: term("upgrade", "branches")),
         ("What's New", lambda: run("porygon-evolved"))]),
     ("demos", "Demos", "3D Demos", [
         "SGI workstations were the polygon machines of the 1990s, and these "
@@ -108,6 +114,49 @@ PAGES = [
     ], [("Desktop Settings", lambda: run("/opt/MaXX/bin/desktop")),
         ("Porygon Colours", lambda: run("porygon-theme", "on")),
         ("SGI Colours", lambda: run("porygon-theme", "off"))]),
+    ("calm", "Wellbeing", "A Healthier Computer", [
+        "Porygon tries to be good company rather than a slot machine.",
+        "",
+        "  •  Night light: the screen warms up in the evening (20:00 to 07:00).",
+        "  •  Rest: after about 50 minutes at the keyboard, a small window "
+        "suggests resting your eyes. Five minutes away counts as a rest, so it "
+        "never nags twice. Every reminder can be snoozed or ignored; nothing "
+        "ever locks you out.",
+        "  •  Bedtime: one reminder at 23:30, with rain and a sleep timer.",
+        "",
+        "Toolchest → Calm has breathing, sounds, sleep timers and Porygon-Z, "
+        "someone to talk to who runs entirely on this computer.",
+    ], [("Breathe", lambda: run("porygon-wellbeing", "breathe")),
+        ("Talk to Porygon-Z", lambda: term("porygon-z", hold=False)),
+        ("Change Times", lambda: run("bash", "-c",
+            "porygon-wellbeing status >/dev/null; /opt/MaXX/bin/xnedit ~/.config/porygon/wellbeing.conf; porygon-wellbeing restart"))]),
+    ("russian", "Russian", "Learn Russian", [
+        "From the alphabet to B2, offline: a route through the levels, "
+        "spaced-repetition words with spoken Russian, listening practice, a "
+        "library and a dictionary, and a tutor that runs on this computer.",
+        "",
+        "The big pieces (the tutor model, voices, audiobooks, dictionaries) are "
+        "downloaded once, checked file by file, and then work without the "
+        "internet. Toolchest → Russian has everything.",
+    ], [("The Path", lambda: term("porygon-russian", "path")),
+        ("Words", lambda: term("porygon-russian", "words", "--say", hold=False)),
+        ("Tutor", lambda: term("porygon-russian", "tutor", hold=False)),
+        ("Download Material", lambda: term("sudo", "porygon-content"))]),
+    ("privacy", "Privacy", "What Talks to the Internet", [
+        "A computer that works for you: no accounts, no telemetry, no adverts. "
+        "This is everything on Porygon that uses the network, and when:",
+        "",
+        "  •  Updates (upgrade, pamac): Manjaro's mirrors and the AUR, when you "
+        "run them, or when Add/Remove Software checks for updates.",
+        "  •  The clock: an NTP time server, now and then (systemd-timesyncd).",
+        "  •  Russian downloads: only when you ask, from GitHub, Kiwix and the "
+        "Internet Archive.",
+        "  •  Firefox: the sites you visit. Telemetry, studies, Pocket and "
+        "sponsored tiles are off.",
+        "",
+        "Porygon-Z and the Russian tutor never leave this machine. There's no "
+        "online check and no fallback DNS to Google or Cloudflare.",
+    ], [("Show Connections Now", lambda: term("ss", "-tupn"))]),
     ("about", "About", "About Porygon", [
         "Porygon (Manjaro edition)",
         "",

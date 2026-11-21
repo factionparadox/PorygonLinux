@@ -41,7 +41,8 @@ B="$B" REPO="$REPO" bash "$TOP/build/aur.sh" "$CONF" "$MIRROR"
 echo "==> ISO"
 WORK=/var/tmp/porygon-work
 rm -rf "$WORK"
-P=$(mktemp -d)
+P=$B/profile          # on disk: it can hold your music and Porygon-Z's model
+rm -rf "$P"; mkdir -p "$P"
 cp -a profile/. "$P/"
 cp "$CONF" "$P/pacman.conf"
 # your pictures (kept out of git): art/logo.png -> boot menu, boot splash
@@ -50,15 +51,32 @@ cp "$CONF" "$P/pacman.conf"
 LOGO=$TOP/art/logo.png
 # convenience for WSL: pick the pictures up from Windows Downloads if they
 # aren't in art/ yet (porygon.png = logo, porygon2.png = fastfetch)
-for d in /mnt/c/Users/*/Downloads; do
+for d in /mnt/[a-z]/Users/*/Downloads; do
     [ -f "$LOGO" ] || { [ -f "$d/porygon.png" ] && cp "$d/porygon.png" "$LOGO"; }
     [ -f "$TOP/art/fastfetch.png" ] || { [ -f "$d/porygon2.png" ] && cp "$d/porygon2.png" "$TOP/art/fastfetch.png"; }
 done 2>/dev/null
 if [ -f "$LOGO" ]; then echo "==> Using your logo"; else LOGO=$TOP/art/placeholder-logo.png; fi
 python3 "$TOP/art/logo-assets.py" "$LOGO" "$P" "$TOP/art/fastfetch.png"
+
+# your own things from other Porygon-like projects: Porygon-Z's model (an Ollama
+# models folder), music and ambience. Looked for in PorygonLinux/local first, then
+# in your DreamOS clone's local/ folder. Never in git.
+UHOME=$(getent passwd "${SUDO_USER:-root}" | cut -d: -f6)
+for x in felix-models music ambience; do
+    for d in "$TOP/local" "$UHOME/DreamOS/local" "$UHOME/dreamos/local"; do
+        [ -d "$d/$x" ] || continue
+        case $x in
+            felix-models) dst=$P/airootfs/usr/share/porygon/porygon-z/models ;;
+            *)            dst=$P/airootfs/usr/share/porygon/$x ;;
+        esac
+        echo "==> Carrying $x from $d ($(du -sh "$d/$x" | cut -f1))"
+        mkdir -p "$dst"; cp -a "$d/$x/." "$dst/"
+        break
+    done
+done
 rm -rf "$B/out"
 mkarchiso -v -r -w "$WORK" -o "$B/out" "$P"
-rm -rf "$P"
+rm -rf "$P"   # the copy of your music and model; the originals are untouched
 ISO=$(ls -t "$B"/out/*.iso | head -1)
 cp "$ISO" "$TOP/out/"
 [ -n "${SUDO_UID:-}" ] && chown -R "$SUDO_UID:$SUDO_GID" "$TOP/out" 2>/dev/null || true

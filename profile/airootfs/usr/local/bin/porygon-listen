@@ -1,0 +1,133 @@
+#!/bin/bash
+# porygon-listen: the player behind Toolchest → Calm and the rest reminders. Music and ambience are two
+# separate mpv players, so rain can carry on under an album.
+#
+#   porygon-listen music PATH [START_FILE] [--shuffle]   play a folder (or one file) from ~/Music
+#   porygon-listen music-stop
+#   porygon-listen ambience MOOD                          loop ~/Ambience/MOOD (a folder of sounds)
+#   porygon-listen ambience off
+#   porygon-listen volume 0-100                           the ambience volume (remembered)
+#   porygon-listen sleep MINUTES | off                    fade everything out and stop after MINUTES
+#   porygon-listen stop                                   stop music and ambience now
+#   porygon-listen status                                 JSON for the shell
+#
+# The music player answers the media keys if mpv-mpris is installed;
+# the ambience player deliberately doesn't, so the keys always control your music.
+# A mood folder whose name contains "meditat" (guided meditations) plays once, in order;
+# every other mood loops, shuffled.
+set -u
+run=${XDG_RUNTIME_DIR:-/tmp/porygon-$UID}/porygon-listen
+state=${XDG_STATE_HOME:-$HOME/.local/state}/porygon
+music_dir=$(xdg-user-dir MUSIC 2>/dev/null || echo "$HOME/Music")
+[ "$music_dir" = "$HOME" ] && music_dir=$HOME/Music
+ambience_dir=$HOME/Ambience
+mkdir -p "$run" "$state"
+audio='.*\.\(flac\|mp3\|ogg\|oga\|opus\|m4a\|aac\|wav\|wv\|ape\|alac\|aiff\?\)$'
+
+ipc() { # ipc SLOT JSON-COMMAND  -> prints mpv's reply
+  [ -S "$run/$1.sock" ] || return 1
+  printf '%s\n' "$2" | socat -t 1 - "UNIX-CONNECT:$run/$1.sock" 2>/dev/null
+}
+get() { ipc "$1" "{\"command\":[\"get_property\",\"$2\"]}" | jq -r 'select(.error == "success") | .data' 2>/dev/null; }
+alive() { [ -n "$(get "$1" pid)" ]; }
+quit() {
+  ipc "$1" '{"command":["quit"]}' >/dev/null || true
+  for _ in 1 2 3 4 5 6 7 8 9 10; do alive "$1" || break; sleep 0.1; done
+  rm -f "$run/$1.sock"
+  [ "$1" = ambience ] && rm -f "$run/ambience-mood"
+}
+vol() { cat "$state/ambience-volume" 2>/dev/null || echo 60; }
+mpris_script() {
+  for f in /etc/mpv/scripts/mpris.so /usr/lib/mpv-mpris/mpris.so /usr/share/mpv/scripts/mpris.so; do
+    [ -f "$f" ] && { echo "--script=$f"; return; }
+  done
+}
+playlist() { # playlist DIR -> every audio file under DIR, in folder order
+  find -L "$1" -type f -iregex "$audio" -print0 | sort -zV | tr '\0' '\n'
+}
+cancel_sleep() {
+  systemctl --user stop porygon-listen-sleep.timer >/dev/null 2>&1 || true
+  rm -f "$run/sleep-until"
+}
+
+case ${1:-status} in
+music)
+  path=${2:?which folder or file?}
+  start=${3:-}; shuffle=
+  [ "$start" = --shuffle ] && { start=; shuffle=1; }
+  [ "${4:-}" = --shuffle ] && shuffle=1
+  [ -e "$path" ] || { echo "no such file or folder: $path" >&2; exit 1; }
+  if [ -d "$path" ]; then playlist "$path" > "$run/playlist.m3u"; else printf '%s\n' "$path" > "$run/playlist.m3u"; fi
+  [ -s "$run/playlist.m3u" ] || { echo "no music in $path" >&2; exit 1; }
+  index=0
+  [ -n "$start" ] && index=$(( $(grep -nxF -- "$start" "$run/playlist.m3u" | head -1 | cut -d: -f1) - 1 ))
+  [ "$index" -ge 0 ] 2>/dev/null || index=0
+  quit music
+  # shellcheck disable=SC2046
+  setsid -f mpv --no-config --no-video --idle=no --really-quiet --audio-display=no \
+    --input-ipc-server="$run/music.sock" --title="Porygon music" \
+    --playlist="$run/playlist.m3u" --playlist-start="$index" ${shuffle:+--shuffle} \
+    $(mpris_script) >/dev/null 2>&1
+  ;;
+music-stop) quit music ;;
+ambience)
+  mood=${2:?which mood? (a folder in ~/Ambience, or off)}
+  quit ambience
+  [ "$mood" = off ] && exit 0
+  [ -d "$ambience_dir/$mood" ] || { echo "no mood called $mood in $ambience_dir" >&2; exit 1; }
+  playlist "$ambience_dir/$mood" > "$run/ambience.m3u"
+  [ -s "$run/ambience.m3u" ] || { echo "no sounds in $ambience_dir/$mood" >&2; exit 1; }
+  case ${mood,,} in
+    *meditat*) mode=(--loop-playlist=no) ;;
+    *) mode=(--loop-playlist=inf --shuffle) ;;
+  esac
+  printf '%s\n' "$mood" > "$run/ambience-mood"
+  setsid -f mpv --no-config --load-scripts=no --no-video --idle=no --really-quiet \
+    --audio-display=no --input-ipc-server="$run/ambience.sock" --title="Porygon ambience" \
+    --volume="$(vol)" --playlist="$run/ambience.m3u" "${mode[@]}" \
+    --gapless-audio=yes --audio-client-name="Porygon ambience" >/dev/null 2>&1
+  ;;
+volume)
+  v=${2:?0-100}; v=${v%.*}
+  [ "$v" -ge 0 ] 2>/dev/null && [ "$v" -le 100 ] || { echo "volume is 0-100" >&2; exit 1; }
+  echo "$v" > "$state/ambience-volume"
+  ipc ambience "{\"command\":[\"set_property\",\"volume\",$v]}" >/dev/null || true
+  ;;
+sleep)
+  m=${2:?minutes, or off}
+  cancel_sleep
+  [ "$m" = off ] && exit 0
+  [ "$m" -gt 0 ] 2>/dev/null || { echo "minutes must be a number" >&2; exit 1; }
+  systemd-run --user --quiet --unit=porygon-listen-sleep --on-active="${m}m" \
+    "$(readlink -f "$0")" fade-out >/dev/null || { echo "couldn't set the sleep timer" >&2; exit 1; }
+  date -d "+$m min" +%s > "$run/sleep-until"
+  ;;
+fade-out) # run by the sleep timer: fade both players over 30 seconds, then stop them
+  rm -f "$run/sleep-until"
+  declare -A start
+  for s in music ambience; do
+    start[$s]=$(get "$s" volume)
+  done
+  for step in $(seq 29 -1 0); do
+    for s in music ambience; do
+      [ -n "${start[$s]}" ] && ipc "$s" "{\"command\":[\"set_property\",\"volume\",$(awk "BEGIN{print ${start[$s]}*$step/30}")]}" >/dev/null
+    done
+    sleep 1
+  done
+  quit music; quit ambience
+  ;;
+stop) cancel_sleep; quit music; quit ambience ;;
+status)
+  mood=; alive ambience && mood=$(cat "$run/ambience-mood" 2>/dev/null)
+  music=false; title=; paused=false
+  if alive music; then
+    music=true; title=$(get music media-title); paused=$(get music pause)
+  fi
+  until=; [ -f "$run/sleep-until" ] && until=$(date -d "@$(cat "$run/sleep-until")" +%H:%M)
+  jq -cn --argjson music "$music" --argjson paused "${paused:-false}" --arg title "$title" \
+    --arg ambience "$mood" --argjson volume "$(vol)" --arg sleepUntil "$until" \
+    --arg musicDir "$music_dir" --arg ambienceDir "$ambience_dir" \
+    '{$music, $paused, $title, $ambience, $volume, $sleepUntil, $musicDir, $ambienceDir}'
+  ;;
+*) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

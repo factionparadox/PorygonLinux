@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""porygon-breathe [MINUTES] - a slow-breathing window: a polygon that grows
+as you breathe in, holds, shrinks as you breathe out, and holds (four seconds
+each). Close it any time. (porygon-wellbeing breathe also starts the
+meditation sounds, if you have any.)"""
+import math, subprocess, sys, time, tkinter as tk
+BG, PINK, PINK_L, BLUE, BLUE_D, INK = "#16182c", "#ec849d", "#f7b2c2", "#5496ce", "#265284", "#f0f2f8"
+minutes = float(sys.argv[1]) if len(sys.argv) > 1 else 2
+r = tk.Tk(); r.title("Breathe"); r.configure(bg=BG); r.geometry("520x560+400+120")
+c = tk.Canvas(r, width=520, height=470, bg=BG, highlightthickness=0); c.pack()
+word = tk.Label(r, text="", font=("Helvetica", 20, "italic"), bg=BG, fg=PINK_L); word.pack()
+tk.Button(r, text="Close", command=r.destroy, bg="#c3bccb", bd=2, font=("Helvetica", 11, "bold")).pack(pady=8)
+PHASES = [("Breathe in", 4, 0.35, 1.0), ("Hold", 4, 1.0, 1.0), ("Breathe out", 4, 1.0, 0.35), ("Hold", 4, 0.35, 0.35)]
+start = time.time(); spin = 0.0
+def frame():
+    global spin
+    t = time.time() - start
+    if t > minutes * 60:
+        word.config(text="Well done."); return
+    cyc = t % 16; acc = 0
+    for name, dur, a, b in PHASES:
+        if cyc < acc + dur:
+            p = (cyc - acc) / dur; p = 0.5 - 0.5 * math.cos(math.pi * p)
+            s = a + (b - a) * p; word.config(text=name); break
+        acc += dur
+    spin += 0.004
+    c.delete("all")
+    R = 190 * s
+    for layer, col, w in ((1.0, BLUE_D, 2), (0.72, BLUE, 2), (0.44, PINK, 3)):
+        pts = []
+        for k in range(6):
+            ang = spin * (1 if layer != 0.72 else -1) + k * math.pi / 3
+            pts += [260 + R * layer * math.cos(ang), 235 + R * layer * math.sin(ang)]
+        c.create_polygon(pts, outline=col, fill="", width=w)
+    r.after(33, frame)
+frame(); r.mainloop()

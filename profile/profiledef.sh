@@ -34,4 +34,13 @@ file_permissions=(
   ["/usr/local/bin/porygon-theme"]="0:0:755"
   ["/usr/local/bin/porygon-setup-home"]="0:0:755"
   ["/usr/local/bin/porygon-make-scheme"]="0:0:755"
+  ["/usr/local/bin/porygon-russian"]="0:0:755"
+  ["/usr/local/bin/porygon-content"]="0:0:755"
+  ["/usr/local/bin/porygon-z"]="0:0:755"
+  ["/usr/local/bin/porygon-listen"]="0:0:755"
+  ["/usr/local/bin/porygon-nudge"]="0:0:755"
+  ["/usr/local/bin/porygon-breathe"]="0:0:755"
+  ["/usr/local/bin/porygon-wellbeing"]="0:0:755"
+  ["/usr/lib/porygon/porygon-z-models"]="0:0:755"
+  ["/usr/lib/porygon/power-source"]="0:0:755"
 )

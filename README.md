@@ -4,6 +4,11 @@ A fun little Manjaro-based distro that boots into a 1990s SGI workstation: the
 [MaXX Interactive Desktop](https://docs.maxxinteractive.com/) (a licensed
 recreation of IRIX's Indigo Magic desktop) on X11.
 
+**A computer that works for you.** No accounts, no telemetry, nothing that
+phones home behind your back; the AI runs on the machine; the computer nudges
+you to rest instead of keeping you hooked. With a writer's kit (spelling in
+British English and Russian, offline dictionaries) and an offline Russian course.
+
 - **Base:** Manjaro stable (yes, really), `linux72` kernel, pamac. MaXX's own
   install guide is written for Manjaro, so this is the officially blessed way to be wrong.
 - **systemd:** the liberated fork from the AUR (`systemd-liberated-git`),
@@ -16,7 +21,7 @@ recreation of IRIX's Indigo Magic desktop) on X11.
 - **Root filesystem:** XFS, as on IRIX
 - **Laptop bits:** NetworkManager (`nmtui`), PipeWire, power-profiles-daemon,
   thermald, tap-to-click, brightness and volume keys
-- **Apps:** Firefox, xterm, xpdf, pavucontrol, fastfetch
+- **Apps:** Firefox, pamac (Add/Remove Software), qmmp, mpv, Kiwix, xpdf, pavucontrol, fastfetch
 
 ## What you get
 
@@ -38,6 +43,23 @@ recreation of IRIX's Indigo Magic desktop) on X11.
   Firefox restyled with square bevelled toolbars and a pink tab (via
   autoconfig, so every profile gets it once; edit the profile's
   `chrome/userChrome.css` to change it).
+- **Wellbeing:** a night light in the evening, a gentle "rest your eyes?"
+  after about 50 minutes at the keyboard (time away counts, so it never nags
+  twice), one bedtime reminder with rain and a sleep timer, and a breathing
+  window. Nothing ever locks you out. Settings in the System Manager or
+  `~/.config/porygon/wellbeing.conf`.
+- **Calm (Toolchest):** breathing, ambience moods (one per folder in
+  `~/Ambience`), sleep timers, music, and **Porygon-Z**, someone to talk to who
+  runs on this computer through a local Ollama (`porygon-z`).
+- **Russian (Toolchest):** alphabet to B2 offline: a route through the levels,
+  spaced-repetition words with Piper voices, listening, a library, a Kiwix
+  dictionary and a local AI tutor. The large pieces download once with
+  `sudo porygon-content`, each file checked.
+- **Privacy:** Firefox with telemetry, studies, Pocket and sponsored tiles off;
+  NetworkManager's online check off; no fallback DNS. The System Manager's
+  Privacy page lists everything that uses the network.
+- **Power:** thermald, power-saver profile on battery, sleeping PCI/USB devices
+  (not keyboards and mice), sound-chip and Wi-Fi power saving, NMI watchdog off.
 - **What's New:** after `upgrade` ("Porygon evolved into Porygon2!") or
   `dubious-disc` ("Porygon2 evolved into Porygon-Z!"), a window lists what
   changed.
@@ -54,7 +76,10 @@ so your system keyring isn't touched:
 ./build.sh
 ```
 
-The ISO lands in `out/`. The first build compiles a handful of AUR packages
+The ISO lands in `out/`. Your own large files can ride along in `local/`
+(kept out of git): `local/felix-models` (Porygon-Z's Ollama model),
+`local/music` and `local/ambience`. A `DreamOS/local` folder in your home is
+used too. The first build compiles a handful of AUR packages
 inside a clean Manjaro chroot (`gtk2` takes the longest); later builds reuse them.
 
 ## Use
@@ -69,9 +94,14 @@ inside a clean Manjaro chroot (`gtk2` takes the longest); later builds reuse the
 | Command | Does |
 |---|---|
 | `upgrade` | update the system (via pamac) |
-| `upgrade install PKG` | install; when Manjaro and the AUR both have it, pick the source by number |
+| `upgrade install PKG` | install, picking the source by number: Manjaro stable, testing or unstable (when newer there), or the AUR. A testing/unstable choice sticks through updates |
+| `upgrade branches` | programs on testing/unstable; move one back to stable |
 | `upgrade remove PKG` / `search TERM` / `info PKG` / `list` / `clean` | the usual |
 | `upgrade mirrors` | pick the fastest Manjaro mirrors |
+| `porygon-z` | talk to Porygon-Z (`--journal` keeps the conversation) |
+| `porygon-russian path` / `words` / `tutor` / `listen` | the Russian course |
+| `porygon-wellbeing status` / `restart` / `breathe` | the reminders |
+| `porygon-listen ambience MOOD` / `sleep 45` / `stop` | calm sounds |
 | `dubious-disc` | full evolution: system update, then rebuilds MaXX and the other AUR parts if there are newer versions (`pamac upgrade --aur --devel`, so it also rebuilds liberated systemd from its newest commit - slow) |
 
 ## Licences

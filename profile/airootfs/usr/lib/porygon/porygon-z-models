@@ -1,0 +1,14 @@
+#!/bin/sh
+# Porygon-Z's model ships on the stick (/usr/share/porygon/porygon-z/models). Before Ollama
+# starts, link those files into its model folder: no download and no second copy. Models
+# added later (the Russian tutor) download into the same folder as usual.
+src=/usr/share/porygon/porygon-z/models
+dst=${OLLAMA_MODELS:-/var/lib/ollama/models}
+[ -d "$src" ] || exit 0
+cd "$src" || exit 0
+find . -type f | while IFS= read -r f; do
+  f=${f#./}
+  mkdir -p "$dst/$(dirname "$f")"
+  [ -e "$dst/$f" ] || ln -sf "$src/$f" "$dst/$f"
+done
+exit 0

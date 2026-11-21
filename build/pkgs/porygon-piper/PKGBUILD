@@ -1,0 +1,17 @@
+# Piper speech for the Russian kit (porygon-russian say).
+pkgname=porygon-piper
+pkgver=2023.11.14_2
+_tag=2023.11.14-2
+pkgrel=1
+pkgdesc='Piper text-to-speech (prebuilt release), for the Porygon Russian kit'
+arch=(x86_64)
+url='https://github.com/rhasspy/piper'
+license=(MIT)
+options=(!strip !debug)
+source=("piper-$_tag.tar.gz::$url/releases/download/$_tag/piper_linux_x86_64.tar.gz")
+sha256sums=(a50cb45f355b7af1f6d758c1b360717877ba0a398cc8cbe6d2a7a3a26e225992)
+
+package() {
+  install -d "$pkgdir/usr/lib/porygon/piper"
+  cp -a piper/. "$pkgdir/usr/lib/porygon/piper/"
+}

@@ -1,0 +1,194 @@
+#!/bin/bash
+# porygon-wellbeing: Porygon's gentle reminders (ported from Dream OS to X11).
+# Started at login by the Porygon session. Nothing here ever locks you out:
+# every reminder is a small window you can answer, postpone or ignore.
+#
+#   - Night light: the screen turns warmer in the evening and back in the morning.
+#   - Rest: after a stretch at the computer, a quiet suggestion to rest your eyes.
+#     Being away from the keyboard for a few minutes counts as a rest, so it never
+#     nags after you've already had one.
+#   - Bedtime: one reminder at bedtime, with a button for rain and a sleep timer.
+#   - Breathe: the rest reminder can open the breathing window.
+#
+# Settings: ~/.config/porygon/wellbeing.conf (made on first start), or the
+# Wellbeing page in the System Manager. After editing by hand, run
+#   porygon-wellbeing restart
+#
+#   porygon-wellbeing            run (what the session does)
+#   porygon-wellbeing restart    re-read the settings
+#   porygon-wellbeing stop
+#   porygon-wellbeing status
+#   porygon-wellbeing breathe    the breathing window, with the meditation sounds
+set -u
+conf_dir=${XDG_CONFIG_HOME:-$HOME/.config}
+conf=$conf_dir/porygon/wellbeing.conf
+run=${XDG_RUNTIME_DIR:-/tmp/porygon-$UID}/porygon-wellbeing
+mkdir -p "$run" "$(dirname "$conf")"
+
+defaults() {
+  NIGHT_LIGHT=yes; NIGHT_FROM=20:00; NIGHT_TO=07:00; NIGHT_TEMPERATURE=3400
+  BEDTIME=23:30; BEDTIME_MOOD=rain; BEDTIME_SLEEP=45
+  BREAK_EVERY=50; BREAK_AWAY=5; MEDITATION_MOOD=meditation
+}
+
+write_default_conf() {
+  [ -f "$conf" ] && return
+  cat > "$conf" <<'EOF'
+# Porygon wellbeing. After changing anything here, run:  porygon-wellbeing restart
+# (or use the Wellbeing page in the System Manager, which does it for you)
+
+# Night light: the screen turns warmer (more orange) between these times.
+NIGHT_LIGHT=yes
+NIGHT_FROM=20:00
+NIGHT_TO=07:00
+# 6500 is no change; lower is warmer. 3400 is a soft amber, 2500 is very orange.
+NIGHT_TEMPERATURE=3400
+
+# Bedtime: one reminder at this time (leave it empty to switch it off). Its button
+# plays BEDTIME_MOOD (a folder in ~/Ambience) and fades everything out after
+# BEDTIME_SLEEP minutes.
+BEDTIME=23:30
+BEDTIME_MOOD=rain
+BEDTIME_SLEEP=45
+
+# Rest: a reminder after BREAK_EVERY minutes at the computer (0 switches it off).
+# BREAK_AWAY minutes away from the keyboard counts as a rest. The reminder's
+# Breathe button opens the breathing window with MEDITATION_MOOD (in ~/Ambience).
+BREAK_EVERY=50
+BREAK_AWAY=5
+MEDITATION_MOOD=meditation
+EOF
+}
+
+load() {
+  defaults
+  write_default_conf
+  # shellcheck disable=SC1090
+  . "$conf" 2>/dev/null || true
+}
+
+minutes_of() { local h=${1%%:*} m=${1##*:}; echo $(( 10#$h * 60 + 10#$m )); }
+valid_time() { [[ $1 =~ ^([01]?[0-9]|2[0-3]):[0-5][0-9]$ ]]; }
+
+# a mood folder in ~/Ambience: the one asked for, or any folder whose name contains it
+mood_dir() {
+  [ -d "$HOME/Ambience/$1" ] && { echo "$1"; return; }
+  local m; m=$(find -L "$HOME/Ambience" -mindepth 1 -maxdepth 1 -type d -iname "*$1*" -printf '%f\n' 2>/dev/null | head -1)
+  [ -n "$m" ] && echo "$m"
+}
+
+# --- night light ---------------------------------------------------------------------------
+night_now() { # is it night-light time? (the window can cross midnight)
+  local now from to
+  now=$(minutes_of "$(date +%H:%M)"); from=$(minutes_of "$NIGHT_FROM"); to=$(minutes_of "$NIGHT_TO")
+  if [ "$from" -le "$to" ]; then [ "$now" -ge "$from" ] && [ "$now" -lt "$to" ]
+  else [ "$now" -ge "$from" ] || [ "$now" -lt "$to" ]; fi
+}
+night_state=""
+night_light() {
+  [ "$NIGHT_LIGHT" = yes ] && valid_time "$NIGHT_FROM" && valid_time "$NIGHT_TO" || { [ "$night_state" = warm ] && gammastep -x -m randr >/dev/null 2>&1; night_state=off; return; }
+  command -v gammastep >/dev/null || return
+  if night_now; then
+    [ "$night_state" = warm ] || { gammastep -P -O "$NIGHT_TEMPERATURE" -m randr >/dev/null 2>&1; night_state=warm; }
+  else
+    [ "$night_state" = day ] || { gammastep -x -m randr >/dev/null 2>&1; night_state=day; }
+  fi
+}
+
+# --- reminders -----------------------------------------------------------------------------
+nudge() { # nudge ID TITLE BODY [ACTION=Label ...] - in the background, so the loop never waits
+  local id=$1 title=$2 body=$3; shift 3
+  ( choice=$(porygon-nudge "$title" "$body" "$@" 2>/dev/null); [ -n "$choice" ] && on_action "$id" "$choice" ) &
+}
+
+on_action() {
+  local m
+  case $1:$2 in
+    bedtime:rain)
+      m=$(mood_dir "$BEDTIME_MOOD"); [ -n "$m" ] && porygon-listen ambience "$m"
+      porygon-listen sleep "$BEDTIME_SLEEP" ;;
+    break:breathe)
+      breathe ;;
+    break:later)
+      echo $(( $(date +%s) + 10 * 60 )) > "$run/snooze-until" ;;
+  esac
+}
+
+breathe() { # the meditation sounds (if you have them) and the breathing window
+  local m; m=$(mood_dir "$MEDITATION_MOOD")
+  [ -n "$m" ] && porygon-listen ambience "$m"
+  porygon-breathe 2
+}
+
+idle_minutes() { # whole minutes since the last key press or mouse movement
+  local ms; ms=$(xprintidle 2>/dev/null) || { echo 0; return; }
+  echo $(( ms / 60000 ))
+}
+
+main_loop() {
+  local active=0 bedtime_done="" idle now_s snooze
+  if [ -n "$BEDTIME" ] && valid_time "$BEDTIME" && [ "$(minutes_of "$(date +%H:%M)")" -ge "$(minutes_of "$BEDTIME")" ]; then
+    bedtime_done=$(date +%F)   # logged in after bedtime: tonight's has already "happened"
+  fi
+  while :; do
+    night_light
+    sleep "${PORYGON_WELLBEING_TICK:-60}" & wait $!
+    now_s=$(date +%s)
+
+    # rest: count minutes at the computer; a long enough absence resets the count
+    idle=$(idle_minutes)
+    if [ "$idle" -ge "$BREAK_AWAY" ]; then active=0
+    elif [ "$idle" -lt 1 ]; then active=$(( active + 1 )); fi
+    if [ "$BREAK_EVERY" -gt 0 ] 2>/dev/null && [ "$active" -ge "$BREAK_EVERY" ]; then
+      snooze=$(cat "$run/snooze-until" 2>/dev/null || echo 0)
+      if [ "$now_s" -ge "$snooze" ]; then
+        nudge break "Time to rest your eyes?" \
+          "You've been at the computer for $active minutes. Maybe stretch, get a drink, or look at something far away for a bit." \
+          "breathe=Breathe" "later=In 10 minutes" "ok=Thanks"
+        active=0; rm -f "$run/snooze-until"
+      fi
+    fi
+
+    # bedtime: once a day, at the time
+    if [ -n "$BEDTIME" ] && valid_time "$BEDTIME" && [ "$bedtime_done" != "$(date +%F)" ] &&
+       [ "$(minutes_of "$(date +%H:%M)")" -ge "$(minutes_of "$BEDTIME")" ]; then
+      bedtime_done=$(date +%F)
+      nudge bedtime "It's $BEDTIME" "Bedtime's coming up. If you like, put the rain on and everything will fade out by itself." \
+        "rain=Rain and sleep timer" "no=Not tonight"
+    fi
+  done
+}
+
+case ${1:-run} in
+run)
+  exec 9> "$run/lock"
+  flock -n 9 || { echo "porygon-wellbeing is already running"; exit 0; }
+  echo $$ > "$run/pid"
+  load
+  trap 'gammastep -x -m randr >/dev/null 2>&1; exit 0' TERM INT
+  main_loop
+  ;;
+restart)
+  "$0" stop
+  setsid -f "$0" run >/dev/null 2>&1
+  echo "restarted"
+  ;;
+stop)
+  if [ -f "$run/pid" ] && kill "$(cat "$run/pid")" 2>/dev/null; then
+    for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$(cat "$run/pid")" 2>/dev/null || break; sleep 0.2; done
+  fi
+  rm -f "$run/pid"
+  ;;
+breathe)
+  load; breathe
+  ;;
+status)
+  load
+  if [ -f "$run/pid" ] && kill -0 "$(cat "$run/pid")" 2>/dev/null; then echo "running"; else echo "not running"; fi
+  echo "night light: $NIGHT_LIGHT ($NIGHT_FROM to $NIGHT_TO, ${NIGHT_TEMPERATURE}K)"
+  echo "bedtime:     ${BEDTIME:-off}"
+  echo "rest:        every ${BREAK_EVERY} minutes (0 = off)"
+  echo "settings:    $conf"
+  ;;
+*) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

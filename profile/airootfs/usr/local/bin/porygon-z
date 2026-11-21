@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""porygon-z: someone to talk to. Runs on this computer only, through the local Ollama.
+
+    porygon-z                 talk to Porygon-Z
+    porygon-z --journal       talk, and keep this conversation in your journal
+    porygon-z --people        people you can reach, any time
+
+In a conversation:  /breathe  a minute of slow breathing    /bye (or Ctrl+D)  leave
+Nothing is kept unless you choose --journal (it then goes to ~/.local/share/porygon/porygon-z).
+"""
+import argparse
+import datetime
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+API = os.environ.get('PORYGON_OLLAMA', 'http://127.0.0.1:11434') + '/api/chat'
+MODEL = os.environ.get('PORYGON_Z_MODEL', 'qwen3:4b-instruct-2507-q8_0')
+SHARE = Path(os.environ.get('PORYGON_Z_SHARE', '/usr/share/porygon/porygon-z'))
+XDG_CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
+XDG_DATA = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share'))
+JOURNAL = XDG_DATA / 'porygon/porygon-z'
+
+PURPLE, LILAC, DIM, RESET = '\033[38;5;211m', '\033[38;5;117m', '\033[2m', '\033[0m'
+if not sys.stdout.isatty() or os.environ.get('NO_COLOR'):
+    PURPLE = LILAC = DIM = RESET = ''
+
+PEOPLE = """People you can reach, any time:
+
+  Samaritans       116 123, free, any hour, any day (UK and Ireland)
+                   jo@samaritans.org, or samaritans.org for chat
+  Shout            text SHOUT to 85258, free, any hour (UK)
+  NHS 111          option 2 for urgent mental health help (England)
+  Your GP          for ongoing support, and referrals to talking therapies
+  999              if you or someone else is in immediate danger
+
+And the people in your own life: a friend, family, someone you trust."""
+
+
+def character() -> str:
+    """Porygon-Z's character: your own copy in ~/.config/porygon/porygon-z.txt if you made one."""
+    for path in (XDG_CONFIG / 'porygon/porygon-z.txt', SHARE / 'porygon-z.txt'):
+        if path.is_file():
+            return path.read_text(encoding='utf-8')
+    sys.exit('porygon-z: his character file is missing (porygon-z.txt)')
+
+
+def opener() -> str:
+    hour = datetime.datetime.now().hour
+    if hour < 5 or hour >= 22:
+        return "Hello. It's late; I'm here. How are you doing?"
+    if hour < 12:
+        return "Morning. I'm here. How are things?"
+    if hour < 18:
+        return "Hello. I'm here, no rush. How's today going?"
+    return "Evening. I'm here. How are you doing?"
+
+
+def chat(messages: list, out) -> str:
+    body = json.dumps({'model': MODEL, 'messages': messages, 'stream': True,
+                       'keep_alive': '15m', 'options': {'temperature': 0.7}}).encode()
+    req = urllib.request.Request(API, data=body, headers={'Content-Type': 'application/json'})
+    reply = []
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            for line in resp:
+                if not line.strip():
+                    continue
+                part = json.loads(line)
+                if part.get('error'):
+                    raise RuntimeError(part['error'])
+                text = (part.get('message') or {}).get('content', '')
+                if text:
+                    reply.append(text)
+                    out.write(text)
+                    out.flush()
+                if part.get('done'):
+                    break
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise RuntimeError(f"Porygon-Z's model isn't here yet: sudo porygon-content install porygon-z") from exc
+        raise RuntimeError(f'Ollama said {exc.code}: {exc.reason}') from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError('Ollama is not running: sudo systemctl start ollama') from exc
+    return ''.join(reply).strip()
+
+
+def breathe(rounds: int = 4) -> None:
+    print(f'\n{DIM}Slow breathing, a minute or so. Follow the words; Ctrl+C stops it.{RESET}')
+    try:
+        for _ in range(rounds):
+            for word in ('in', 'hold', 'out', 'hold'):
+                for n in range(4, 0, -1):
+                    print(f'\r  {LILAC}{word:<5}{RESET} {"●" * n}{" " * (4 - n)}', end='', flush=True)
+                    time.sleep(1)
+        print(f'\r{" " * 20}\r  {DIM}...and back to the conversation.{RESET}\n')
+    except KeyboardInterrupt:
+        print(f'\r{" " * 20}\r')
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog='porygon-z', description=__doc__.splitlines()[0])
+    ap.add_argument('--journal', action='store_true', help='keep this conversation in your journal')
+    ap.add_argument('--people', action='store_true', help='people you can reach, any time')
+    args = ap.parse_args()
+    if args.people:
+        print(PEOPLE)
+        return
+
+    messages = [{'role': 'system', 'content': character()}]
+    first = opener()
+    messages.append({'role': 'assistant', 'content': first})
+    print(f'{PURPLE}Porygon-Z{RESET}  {first}')
+    print(f'{DIM}(/breathe for slow breathing, /bye to leave. Nothing is kept'
+          f'{" except in your journal" if args.journal else ""}.){RESET}\n')
+
+    log = None
+    if args.journal:
+        JOURNAL.mkdir(parents=True, exist_ok=True)
+        log = open(JOURNAL / f'{datetime.datetime.now():%Y-%m-%d %H%M}.md', 'a', encoding='utf-8')
+        log.write(f'Porygon-Z: {first}\n\n')
+
+    while True:
+        try:
+            text = input(f'{LILAC}you{RESET}    ').strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not text:
+            continue
+        if text.lower() in ('/bye', '/quit', '/exit'):
+            break
+        if text.lower() == '/breathe':
+            breathe()
+            continue
+        if text.lower() == '/people':
+            print(PEOPLE + '\n')
+            continue
+        messages.append({'role': 'user', 'content': text})
+        print(f'{PURPLE}Porygon-Z{RESET}  ', end='', flush=True)
+        try:
+            reply = chat(messages, sys.stdout)
+        except RuntimeError as exc:
+            print(f'{DIM}{exc}{RESET}\n')
+            messages.pop()
+            continue
+        print('\n')
+        messages.append({'role': 'assistant', 'content': reply})
+        if log:
+            log.write(f'You: {text}\n\nPorygon-Z: {reply}\n\n')
+            log.flush()
+
+    print(f'{PURPLE}Porygon-Z{RESET}  Take care of yourself. I\'m here whenever you want to talk.')
+    if log:
+        log.close()
+
+
+if __name__ == '__main__':
+    main()

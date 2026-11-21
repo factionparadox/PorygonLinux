@@ -8,5 +8,7 @@ porygon-setup-home
 xbindkeys -f /etc/porygon/xbindkeysrc &
 # the start-up chime, then the System Manager on first login
 (sleep 3; porygon-chime) &
+# night light and the gentle rest/bedtime reminders
+porygon-wellbeing &
 (sleep 9; porygon-welcome --first-login) &
 exec /opt/MaXX/etc/skel/Xsession.dt

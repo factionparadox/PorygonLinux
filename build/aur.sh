@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 TOP=$PWD
 CONF=$1                       # rendered Manjaro pacman.conf from build.sh
 MIRROR=$2
-PKGS=(ncurses5-compat-libs libjpeg6-turbo libpng15 libtiff5 gtk2 maxx-desktop systemd-liberated-git)
+PKGS=(ncurses5-compat-libs libjpeg6-turbo libpng15 libtiff5 gtk2 maxx-desktop systemd-liberated-git porygon-piper)
 B=${B:-/var/tmp/porygon-build}
 REPO=${REPO:-$B/repo}
 CH=$B/chroot
@@ -17,7 +17,10 @@ mkdir -p "$REPO" "$AUR"
 
 todo=()
 for p in "${PKGS[@]}"; do
-    if [ -d "$AUR/$p" ]; then git -C "$AUR/$p" pull -q; else git clone -q "https://aur.archlinux.org/$p.git" "$AUR/$p"; fi
+    if [ -d "$TOP/build/pkgs/$p" ]; then
+        # Porygon's own recipes (build/pkgs/NAME)
+        rm -rf "$AUR/$p"; cp -r "$TOP/build/pkgs/$p" "$AUR/$p"
+    elif [ -d "$AUR/$p" ]; then git -C "$AUR/$p" pull -q; else git clone -q "https://aur.archlinux.org/$p.git" "$AUR/$p"; fi
     ver=$(grep -E '^(pkgver|pkgrel)=' "$AUR/$p/PKGBUILD" | cut -d= -f2 | paste -sd-)
     if [[ $p == *-git ]]; then
         # -git packages get their version from the newest commit, so any

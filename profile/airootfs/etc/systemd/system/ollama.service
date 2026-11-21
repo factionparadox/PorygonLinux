@@ -1,0 +1,26 @@
+# Porygon's Ollama: the language-model server behind Porygon-Z and the Russian tutor.
+# This computer only; nothing is sent anywhere.
+[Unit]
+Description=Ollama for Porygon-Z and the Russian tutor (this computer only)
+After=local-fs.target
+
+[Service]
+# Porygon-Z's model comes on the stick: linked into the model folder first
+ExecStartPre=+/usr/lib/porygon/porygon-z-models
+ExecStart=/usr/bin/ollama serve
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Environment=OLLAMA_MODELS=/var/lib/ollama/models
+Environment=HOME=/var/lib/ollama
+# free the memory a minute after the last answer (the tutor's model is ~19 GB)
+Environment=OLLAMA_KEEP_ALIVE=1m
+# CPU only: Vulkan gave Felix 500 errors on the Framework 13 Pro
+Environment=OLLAMA_VULKAN=0
+User=ollama
+Group=ollama
+StateDirectory=ollama
+Nice=5
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

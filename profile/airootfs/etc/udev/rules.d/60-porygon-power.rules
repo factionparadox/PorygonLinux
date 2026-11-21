@@ -1,0 +1,9 @@
+# Porygon power saving.
+# PCI devices and USB devices may sleep when idle...
+ACTION=="add", SUBSYSTEM=="pci", TEST=="power/control", ATTR{power/control}="auto"
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", TEST=="power/control", ATTR{power/control}="auto"
+# ...except keyboards and mice, which would miss the first keypress.
+ACTION=="bind", SUBSYSTEM=="usb", DRIVER=="usbhid", RUN+="/bin/sh -c 'echo on > /sys%p/../power/control'"
+# On battery: the power-saver profile. Plugged in: balanced.
+SUBSYSTEM=="power_supply", ENV{POWER_SUPPLY_TYPE}=="Mains", ACTION=="change", RUN+="/usr/bin/systemctl --no-block start porygon-power-source.service"
+SUBSYSTEM=="power_supply", ENV{POWER_SUPPLY_TYPE}=="Mains", ACTION=="add", RUN+="/usr/bin/systemctl --no-block start porygon-power-source.service"

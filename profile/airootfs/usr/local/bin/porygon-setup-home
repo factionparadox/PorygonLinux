@@ -15,6 +15,18 @@ if [ ! -d "$HOME/.maxxdesktop" ]; then
     /opt/MaXX/share/misc/HOME/initMaXX-Desktop-Home.sh >> "$HOME/.console" 2>&1
 fi
 
+# --- music and calm sounds that came on the disc ----------------------------
+# ~/Ambience holds one folder per mood; ~/Music your albums. The ones on the
+# disc are linked in, so your own copies sit beside them (and win on a clash).
+for kind in Music Ambience; do
+    src=/usr/share/porygon/${kind,,}
+    [ -d "$src" ] || continue
+    mkdir -p "$HOME/$kind"
+    for f in "$src"/*; do
+        [ -e "$f" ] && [ ! -e "$HOME/$kind/${f##*/}" ] && ln -s "$f" "$HOME/$kind/${f##*/}"
+    done
+done
+
 # --- Toolchest: MaXX's menus plus Porygon's ---------------------------------
 make_chestrc() {
     local live=""; [ -d /run/archiso ] && live=1
@@ -28,7 +40,59 @@ Menu User
 {
 	"Porygon"		f.menu Porygon
 	"Applications"		f.menu Apps
+	"Calm"			f.menu Calm
+	"Russian"		f.menu Russian
 	"Demos"			f.menu Demos
+}
+MENU
+    # Calm: breathing, Porygon-Z, ambience moods (one entry per folder in ~/Ambience)
+    hold="echo; read -n1 -rsp \\\"Press any key to close.\\\""
+    cat <<MENU
+
+Menu Calm
+{
+	"Breathe"		f.exec "porygon-wellbeing breathe"
+	"Talk to Porygon-Z"	f.exec "$W porygon-z"
+	"Porygon-Z (keep in journal)"	f.exec "$W porygon-z --journal"
+	"People you can reach"	f.exec "$W bash -c 'porygon-z --people; $hold'"
+	separator		f.separator
+	"Music"			f.exec "qmmp $HOME/Music"
+	"Sounds"		f.menu CalmSounds
+	"Sleep Timer"		f.menu CalmSleep
+	"Stop All Sounds"	f.exec "porygon-listen stop"
+}
+Menu CalmSounds
+{
+MENU
+    local d n=0
+    for d in "$HOME"/Ambience/*/; do
+        [ -d "$d" ] || continue
+        d=$(basename "$d"); n=1
+        printf '\t"%s"\t\tf.exec "porygon-listen ambience \\"%s\\""\n' "$d" "$d"
+    done
+    [ "$n" = 1 ] || printf '\t"(no sounds yet: put folders in ~/Ambience)"\tf.nop\n'
+    cat <<MENU
+	separator		f.separator
+	"Sounds Off"		f.exec "porygon-listen ambience off"
+}
+Menu CalmSleep
+{
+	"30 minutes"		f.exec "porygon-listen sleep 30"
+	"45 minutes"		f.exec "porygon-listen sleep 45"
+	"1 hour"		f.exec "porygon-listen sleep 60"
+	"Cancel"		f.exec "porygon-listen sleep off"
+}
+
+Menu Russian
+{
+	"The Path (A1 to B2)"	f.exec "$W bash -c 'porygon-russian path; $hold'"
+	"Words"			f.exec "$W porygon-russian words --say"
+	"Tutor"			f.exec "$W porygon-russian tutor"
+	"Listening"		f.exec "$W porygon-russian listen --pick"
+	"Library"		f.exec "$W bash -c 'porygon-russian library --open; $hold'"
+	"Dictionary"		f.exec "porygon-russian dictionary"
+	separator		f.separator
+	"Download Material"	f.exec "$W bash -c 'sudo porygon-content; $hold'"
 }
 MENU
     cat <<MENU
