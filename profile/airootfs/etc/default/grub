@@ -1,0 +1,17 @@
+# Porygon's GRUB settings (installed system). After editing, run:
+#   sudo grub-mkconfig -o /boot/grub/grub.cfg
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=3
+GRUB_TIMEOUT_STYLE=menu
+GRUB_DISTRIBUTOR="Porygon"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0"
+GRUB_CMDLINE_LINUX=""
+GRUB_PRELOAD_MODULES="part_gpt part_msdos"
+GRUB_GFXMODE=auto
+GRUB_GFXPAYLOAD_LINUX=keep
+GRUB_TERMINAL_OUTPUT=gfxterm
+GRUB_THEME="/usr/share/grub/themes/porygon/theme.txt"
+GRUB_DISABLE_RECOVERY=true
+GRUB_DISABLE_OS_PROBER=true
+# hide the firmware "BootNext" entries Manjaro's GRUB would otherwise list
+GRUB_DISABLE_BOOTNEXT=true

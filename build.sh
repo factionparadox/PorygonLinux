@@ -15,7 +15,7 @@ mkdir -p "$B" "$REPO" "$TOP/out"
 cp -u "$TOP"/repo/*.pkg.tar.zst "$REPO"/ 2>/dev/null || true   # the prebuilt packages
 
 echo "==> Build tools"
-pacman -S --needed --noconfirm archiso arch-install-scripts git python-pillow ttf-dejavu >/dev/null 2>&1
+pacman -S --needed --noconfirm archiso arch-install-scripts git grub python-pillow ttf-dejavu >/dev/null 2>&1
 
 echo "==> Manjaro keyring (kept in $B, your own keyring isn't touched)"
 if [ ! -f "$B/gnupg/.populated" ]; then
@@ -44,11 +44,18 @@ rm -rf "$WORK"
 P=$(mktemp -d)
 cp -a profile/. "$P/"
 cp "$CONF" "$P/pacman.conf"
-# your logo (art/logo.png, kept out of git) -> icons, splash, fastfetch
-if [ -f "$TOP/art/logo.png" ]; then
-    echo "==> Using your logo"
-    python3 "$TOP/art/logo-assets.py" "$TOP/art/logo.png" "$P"
-fi
+# your pictures (kept out of git): art/logo.png -> boot menu, boot splash
+# and icons; art/fastfetch.png -> fastfetch. Without them, the plain
+# polygon mark is used.
+LOGO=$TOP/art/logo.png
+# convenience for WSL: pick the pictures up from Windows Downloads if they
+# aren't in art/ yet (porygon.png = logo, porygon2.png = fastfetch)
+for d in /mnt/c/Users/*/Downloads; do
+    [ -f "$LOGO" ] || { [ -f "$d/porygon.png" ] && cp "$d/porygon.png" "$LOGO"; }
+    [ -f "$TOP/art/fastfetch.png" ] || { [ -f "$d/porygon2.png" ] && cp "$d/porygon2.png" "$TOP/art/fastfetch.png"; }
+done 2>/dev/null
+if [ -f "$LOGO" ]; then echo "==> Using your logo"; else LOGO=$TOP/art/placeholder-logo.png; fi
+python3 "$TOP/art/logo-assets.py" "$LOGO" "$P" "$TOP/art/fastfetch.png"
 rm -rf "$B/out"
 mkarchiso -v -r -w "$WORK" -o "$B/out" "$P"
 rm -rf "$P"

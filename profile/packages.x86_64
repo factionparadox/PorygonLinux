@@ -22,6 +22,8 @@ mkinitcpio
 mkinitcpio-archiso
 syslinux
 efibootmgr
+grub
+plymouth
 edk2-shell
 memtest86+
 memtest86+-efi
@@ -115,5 +117,4 @@ pamac-cli
 firefox
 xpdf
 fastfetch
-chafa
 git

@@ -1,18 +1,25 @@
-# Turns your logo (art/logo.png, any size, ideally transparent) into
-# everything the ISO uses: icons, the boot splash and the fastfetch logo.
-# build.sh runs this on its copy of the profile when art/logo.png exists.
-# usage: python3 logo-assets.py LOGO.png PROFILE_DIR
+# Turns your pictures into everything the ISO shows:
+#   art/logo.png      -> boot menu background (GRUB), boot splash (Plymouth),
+#                        BIOS boot screen, System Manager + desktop icons
+#   art/fastfetch.png -> fastfetch's logo (falls back to logo.png)
+# Both are kept out of git. build.sh runs this on its copy of the profile.
+# usage: python3 logo-assets.py LOGO.png PROFILE_DIR [FASTFETCH.png]
 import os, sys, json, subprocess
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 here = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, here)
 from palette import *
 logo_path, prof = sys.argv[1], sys.argv[2]
+ff_path = sys.argv[3] if len(sys.argv) > 3 and os.path.exists(sys.argv[3]) else logo_path
 share = os.path.join(prof, "airootfs/usr/local/share/porygon")
 os.makedirs(os.path.join(share, "icons"), exist_ok=True)
 
 logo = Image.open(logo_path).convert("RGBA")
 bbox = logo.getchannel("A").getbbox()
 if bbox: logo = logo.crop(bbox)
+def font(name, size):
+    for d in ("/usr/share/fonts/TTF", "/usr/share/fonts/truetype/dejavu"):
+        if os.path.exists(f"{d}/{name}"): return ImageFont.truetype(f"{d}/{name}", size)
+    return ImageFont.load_default()
 def fit(img, size, pad=0.06):
     w, h = img.size; s = size * (1 - 2 * pad) / max(w, h)
     im = img.resize((max(1, round(w * s)), max(1, round(h * s))), Image.LANCZOS)
@@ -31,19 +38,154 @@ sh.putalpha(Image.new("L", img.size, 0)); m = Image.new("L", img.size, 0); m.pas
 shadow = Image.new("RGBA", img.size, (0, 0, 0, 0)); shadow.putalpha(m.filter(ImageFilter.GaussianBlur(8)).point(lambda v: v * 0.45))
 img.alpha_composite(shadow); img.alpha_composite(L, (362, 28))
 d = ImageDraw.Draw(img)
-f = ImageFont.truetype("/usr/share/fonts/TTF/DejaVuSerif-Bold.ttf" if os.path.exists("/usr/share/fonts/TTF/DejaVuSerif-Bold.ttf") else "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 54)
-f2p = "/usr/share/fonts/TTF/DejaVuSans-Oblique.ttf" if os.path.exists("/usr/share/fonts/TTF/DejaVuSans-Oblique.ttf") else "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"
-f2 = ImageFont.truetype(f2p, 15)
+f = font("DejaVuSerif-Bold.ttf", 54)
+f2 = font("DejaVuSans-Oblique.ttf", 15)
 for off, col in ((3, NIGHT), (0, WHITE)):
     d.text((44 + off, 74 + off), "PORYGON", font=f, fill=col)
 d.text((48, 140), "a computer that works for you", font=f2, fill=PINK_LIGHT)
 d.text((48, 160), "Manjaro edition", font=f2, fill=BLUE_LIGHT)
 img.convert("RGB").save(os.path.join(prof, "syslinux/splash.png"))
 
-# fastfetch: show the logo as image art (chafa) in any terminal
-ff = os.path.join(prof, "airootfs/etc/skel/.config/fastfetch")
+# --- the backdrop with the logo, at any size (GRUB + Plymouth) ---
+def backdrop(W, H, tagline=True):
+    tmp = f"/tmp/_bd_{W}x{H}.png"
+    subprocess.run([sys.executable, os.path.join(here, "wallpaper.py"), tmp, str(W), str(H), "7"], check=True)
+    img = Image.open(tmp).convert("RGBA")
+    Ls = int(H * 0.55)
+    L = fit(logo, Ls, pad=0)
+    x, y = int(W * 0.60), int(H * 0.10)
+    m = Image.new("L", img.size, 0); m.paste(L.getchannel("A"), (x + Ls // 40, y + Ls // 40))
+    sh = Image.new("RGBA", img.size, (0, 0, 0, 0)); sh.putalpha(m.filter(ImageFilter.GaussianBlur(Ls // 30)).point(lambda v: int(v * .45)))
+    img.alpha_composite(sh); img.alpha_composite(L, (x, y))
+    d = ImageDraw.Draw(img)
+    big = font("DejaVuSerif-Bold.ttf", int(H * 0.09)); small = font("DejaVuSans-Oblique.ttf", int(H * 0.028))
+    for off, col in ((max(2, H // 300), NIGHT), (0, WHITE)):
+        d.text((int(W * .06) + off, int(H * .12) + off), "PORYGON", font=big, fill=col)
+    if tagline:
+        d.text((int(W * .065), int(H * .24)), "a computer that works for you", font=small, fill=PINK_LIGHT)
+    return img
+
+# GRUB theme: same files on the ISO (grub/themes) and installed system
+def grub_theme(dst):
+    os.makedirs(dst, exist_ok=True)
+    backdrop(1920, 1200).convert("RGB").save(os.path.join(dst, "background.png"))
+    # the highlight bar for the selected entry: pink, slightly translucent
+    for part in ("nw", "n", "ne", "w", "c", "e", "sw", "s", "se"):
+        Image.new("RGBA", (4, 4), PINK + (230,)).save(os.path.join(dst, f"select_{part}.png"))
+    open(os.path.join(dst, "theme.txt"), "w").write("""# Porygon GRUB theme (made by art/logo-assets.py)
+title-text: ""
+desktop-image: "background.png"
+desktop-image-scale-method: "stretch"
+desktop-color: "#16182c"
+terminal-font: "Unifont Regular 16"
++ boot_menu {
+    left = 6%
+    top = 40%
+    width = 42%
+    height = 44%
+    item_font = "Unifont Regular 16"
+    item_color = "#f0f2f8"
+    selected_item_color = "#1a1020"
+    selected_item_pixmap_style = "select_*.png"
+    item_height = 30
+    item_padding = 10
+    item_spacing = 6
+    icon_width = 0
+    icon_height = 0
+    scrollbar = false
+}
++ label {
+    left = 6%
+    top = 88%
+    width = 60%
+    height = 20
+    id = "__timeout__"
+    text = "Starting in %d seconds"
+    color = "#f7b2c2"
+    font = "Unifont Regular 16"
+}
+""")
+grub_theme(os.path.join(prof, "grub/themes/porygon"))
+grub_theme(os.path.join(prof, "airootfs/usr/share/grub/themes/porygon"))
+
+# Plymouth boot splash: backdrop + logo, with a row of dots that fill in
+pt = os.path.join(prof, "airootfs/usr/share/plymouth/themes/porygon")
+os.makedirs(pt, exist_ok=True)
+backdrop(1920, 1200, tagline=False).convert("RGB").save(os.path.join(pt, "background.png"))
+for name, col in (("dot-off.png", BLUE_DARK), ("dot-on.png", PINK_LIGHT)):
+    dot = Image.new("RGBA", (36, 36)); ImageDraw.Draw(dot).ellipse([4, 4, 32, 32], fill=col + (255,)); dot.save(os.path.join(pt, name))
+open(os.path.join(pt, "porygon.plymouth"), "w").write("""[Plymouth Theme]
+Name=Porygon
+Description=Porygon boot splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/porygon
+ScriptFile=/usr/share/plymouth/themes/porygon/porygon.script
+""")
+open(os.path.join(pt, "porygon.script"), "w").write("""// Porygon boot splash: the backdrop, scaled to the screen, and eight
+// dots along the bottom that light up pink as the boot progresses.
+W = Window.GetWidth(); H = Window.GetHeight();
+bg = Image("background.png").Scale(W, H);
+bgs = Sprite(bg); bgs.SetZ(-100);
+off = Image("dot-off.png"); on = Image("dot-on.png");
+scale = H / 1200;
+if (scale < 0.5) scale = 0.5;
+off = off.Scale(off.GetWidth() * scale, off.GetHeight() * scale);
+on = on.Scale(on.GetWidth() * scale, on.GetHeight() * scale);
+n = 8; gap = off.GetWidth() * 1.6;
+x0 = W / 2 - (n - 1) * gap / 2 - off.GetWidth() / 2;
+y0 = H * 0.86;
+for (i = 0; i < n; i++) {
+    dots[i] = Sprite(off); dots[i].SetPosition(x0 + i * gap, y0, 1);
+}
+fun progress_cb(duration, progress) {
+    lit = Math.Int(progress * n + 0.999);
+    for (i = 0; i < n; i++) {
+        if (i < lit) dots[i].SetImage(on); else dots[i].SetImage(off);
+    }
+}
+Plymouth.SetBootProgressFunction(progress_cb);
+
+// messages (e.g. "Press Ctrl+Alt+Del") shown small, centred under the dots
+msg = Sprite(); msg.SetPosition(W / 2, y0 + off.GetHeight() * 2, 2);
+fun message_cb(text) {
+    img = Image.Text(text, 0.95, 0.85, 0.9);
+    msg.SetImage(img); msg.SetX(W / 2 - img.GetWidth() / 2);
+}
+Plymouth.SetMessageFunction(message_cb);
+""")
+
+# fastfetch: its own picture (art/fastfetch.png) turned into true-colour
+# half-block text art, so it shows in winterm/xterm without image support
+FF = Image.open(ff_path).convert("RGBA")
+bb = FF.getchannel("A").getbbox()
+if bb: FF = FF.crop(bb)
+cols = 34
+rows2 = max(2, round(FF.height / FF.width * cols * 0.95)) // 2 * 2   # two pixel rows per text row
+px = FF.resize((cols, rows2), Image.LANCZOS)
+lines = []
+for y in range(0, rows2, 2):
+    line = ""
+    for x in range(cols):
+        t, b = px.getpixel((x, y)), px.getpixel((x, y + 1))
+        ton, bon = t[3] > 110, b[3] > 110
+        if ton and bon:
+            line += "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm\u2580" % (t[:3] + b[:3])
+        elif ton:
+            line += "\x1b[49m\x1b[38;2;%d;%d;%dm\u2580" % t[:3]
+        elif bon:
+            line += "\x1b[49m\x1b[38;2;%d;%d;%dm\u2584" % b[:3]
+        else:
+            line += "\x1b[0m "
+    lines.append(line + "\x1b[0m")
+open(os.path.join(share, "fastfetch-logo.txt"), "w").write("\n".join(lines) + "\n")
+ff = os.path.join(prof, "airootfs/etc/xdg/fastfetch")   # system-wide: every user gets it
 os.makedirs(ff, exist_ok=True)
-json.dump({"logo": {"type": "chafa", "source": "/usr/local/share/porygon/logo.png", "width": 28, "height": 14},
-           "display": {"color": {"keys": "magenta", "title": "blue"}}},
-          open(os.path.join(ff, "config.jsonc"), "w"), indent=2)
+json.dump({
+    "logo": {"type": "file-raw", "source": "/usr/local/share/porygon/fastfetch-logo.txt", "padding": {"right": 2}},
+    "display": {"color": {"keys": "magenta", "title": "blue"}, "separator": "  "},
+    "modules": ["title", "separator", "os", "kernel", "uptime", "packages", "shell", "wm", "terminal",
+                "cpu", "gpu", "memory", "disk", "battery", "break", "colors"]},
+    open(os.path.join(ff, "config.jsonc"), "w"), indent=2)
 print("logo assets ready")
