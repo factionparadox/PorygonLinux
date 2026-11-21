@@ -7,3 +7,4 @@ out/
 art/logo.png
 art/fastfetch.png
 /local/
+__pycache__/
