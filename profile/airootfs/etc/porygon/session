@@ -6,7 +6,14 @@ export PATH=/usr/local/bin:$PATH
 # terminals (winterm) run fish; the text consoles keep bash
 [ -x /usr/bin/fish ] && export SHELL=/usr/bin/fish
 porygon-setup-home
-# laptop keys (brightness, volume) - 5Dwm doesn't handle them itself
+# English and Russian keyboards, Alt+Shift to switch (the strip shows which)
+# (MaXX re-applies the layout saved in KeyboardInput.Choice as it starts, so
+#  that's where the pair goes; the X server's layout comes from the installer)
+L=$(setxkbmap -query | awk '/^layout/{print $2}')
+case ",$L," in *,ru,*) ;; *) L="${L:-us},ru" ;; esac
+setxkbmap -layout "$L" -option grp:alt_shift_toggle
+[ -d "$HOME/.maxxdesktop" ] && echo "$L" > "$HOME/.maxxdesktop/KeyboardInput.Choice"
+# laptop keys (brightness, volume, media, Print) - 5Dwm doesn't handle them itself
 xbindkeys -f /etc/porygon/xbindkeysrc &
 # the start-up chime, then the System Manager on first login
 (sleep 3; porygon-chime) &
@@ -14,8 +21,11 @@ xbindkeys -f /etc/porygon/xbindkeysrc &
 porygon-wellbeing &
 # the status strip: Wi-Fi, Bluetooth, brightness, volume, battery, time
 porygon-status &
-# 5Dwm's compositor off once it has started (saves power; porygon-compositor on to undo)
-porygon-compositor apply &
+# once 5Dwm has started: its compositor off (saves power; porygon-compositor on
+# to undo), then the screen lock - blanks after 10 minutes, locks on lid
+# close and sleep, Super+L. (MaXX reloads the X resources as it starts, so
+# the lock's colours go in after it, and xscreensaver reads them as it starts.)
+(porygon-compositor apply; xrdb -merge /etc/porygon/xscreensaver.ad; exec xscreensaver --no-splash) &
 # started from a snapshot? offer to keep it
 /usr/lib/porygon/snapshot-check &
 (sleep 9; porygon-welcome --first-login) &

@@ -76,7 +76,7 @@ class Wizard:
         tz = os.path.realpath("/etc/localtime").split("zoneinfo/")[-1]
         self.tz = tk.StringVar(value="Europe/London" if tz in ("UTC", "Etc/UTC", "/etc/localtime") else tz)
         self.kb = tk.StringVar(value="gb - English (UK)")
-        self.agree = tk.IntVar(); self.reboot = tk.IntVar(value=1)
+        self.agree = tk.IntVar(); self.reboot = tk.IntVar(value=1); self.encrypt = tk.IntVar(value=1)
         self.ok = False
 
         self.body = tk.Frame(self.root, bg=BG)
@@ -190,8 +190,11 @@ class Wizard:
             e.grid(row=n, column=1, sticky="w", padx=12)
             if n == 0:
                 e.focus_set()
+        tk.Checkbutton(f, text="Encrypt the disk (your password unlocks it when the computer starts;\nafter that the desktop logs you in by itself)", variable=self.encrypt,
+                       bg=BG, activebackground=BG, selectcolor=WHITE, justify="left", anchor="w"
+                       ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(14, 0))
         self.user_msg = tk.Label(f, text="Usernames are lowercase letters, numbers, - and _.", bg=BG, fg=INK, anchor="w")
-        self.user_msg.grid(row=4, column=0, columnspan=2, sticky="w", pady=(14, 0))
+        self.user_msg.grid(row=5, column=0, columnspan=2, sticky="w", pady=(10, 0))
         self.buttons()
 
     def p_region(self):
@@ -212,7 +215,7 @@ class Wizard:
         size = next((d[1] for d in self.disk_list if d[0] == self.disk.get()), "")
         summary = (f"Disk:\t\t{self.disk.get()} ({size})\nUsername:\t{self.user.get()}\n"
                    f"Computer name:\t{self.host.get()}\nTime zone:\t{self.tz.get()}\n"
-                   f"Keyboard:\t{self.kb.get()}")
+                   f"Keyboard:\t{self.kb.get()}\nEncryption:\t{'yes' if self.encrypt.get() else 'no'}")
         box = tk.Label(f, text=summary, bg=WHITE, fg=INK, justify="left", anchor="nw", bd=2,
                        relief="sunken", padx=10, pady=8, font=("Courier", 10))
         box.pack(fill="x")
@@ -259,8 +262,9 @@ class Wizard:
         for c in (["xset", "s", "off", "-dpms"], ["xscreensaver-command", "-exit"]):
             subprocess.run(c, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         env = dict(os.environ, DISK=self.disk.get(), USERNAME=self.user.get(),
-                   HOST=self.host.get() or "porygon", TZONE=self.tz.get(), KB=self.kb.get().split()[0])
-        cmd = ["sudo", "-n", "--preserve-env=DISK,USERNAME,HOST,TZONE,KB", "/usr/local/bin/porygon-install", "--batch"]
+                   HOST=self.host.get() or "porygon", TZONE=self.tz.get(), KB=self.kb.get().split()[0],
+                   ENCRYPT="yes" if self.encrypt.get() else "no")
+        cmd = ["sudo", "-n", "--preserve-env=DISK,USERNAME,HOST,TZONE,KB,ENCRYPT", "/usr/local/bin/porygon-install", "--batch"]
         self.proc = subprocess.Popen(cmd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT)
         self.proc.stdin.write((self.pw1.get() + "\n").encode()); self.proc.stdin.close()

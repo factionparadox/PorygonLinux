@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Porygon's status strip: Wi-Fi, Bluetooth, brightness, volume, battery and
-the time, in a small bevelled bar at the top of the screen. Click a part for
+the time, plus the keyboard (EN/RU), in a small bevelled bar at the top of the screen. Click a part for
 its controls. Also gives the low-battery warnings.
 
     porygon-status          (started by the Porygon session)
 """
-import glob, os, shutil, subprocess, threading, time, tkinter as tk
+import ctypes, ctypes.util, glob, os, shutil, subprocess, threading, time, tkinter as tk
 
 BG, PANEL, FIELD, WHITE = "#d9d3dd", "#c3bccb", "#f0c4d0", "#fbf8fc"
 PINK, PINK_DARK, BLUE, BLUE_DARK, INK, RED = "#ec849d", "#b04a68", "#5496ce", "#265284", "#1a1020", "#b02030"
@@ -36,6 +36,110 @@ def bars(signal):
     return "▂▄▆█"[:n].ljust(4, "·")
 
 
+class Keyboard:
+    """Which keyboard layout (group) is active, straight from the X server.
+    Asking XKB costs one round trip to the local X server, so it can be
+    checked every second without waking anything else."""
+    CORE = 0x0100   # XkbUseCoreKbd
+
+    def __init__(self):
+        self.x = None
+        try:
+            x = ctypes.CDLL(ctypes.util.find_library("X11") or "libX11.so.6")
+            x.XOpenDisplay.restype = ctypes.c_void_p
+            x.XOpenDisplay.argtypes = [ctypes.c_char_p]
+            x.XkbGetState.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p]
+            x.XkbLockGroup.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_uint]
+            x.XFlush.argtypes = [ctypes.c_void_p]
+            self.dpy = x.XOpenDisplay(None)
+            if self.dpy:
+                self.x = x
+        except OSError:
+            pass
+        self.layouts = []
+        self.reload()
+
+    def reload(self):
+        """The layouts' names ("English (UK)", "Russian") as XKB has them."""
+        if not self.x:
+            return
+        x = self.x
+        x.XkbAllocKeyboard.restype = ctypes.c_void_p
+        x.XkbGetNames.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p]
+        x.XGetAtomName.restype = ctypes.c_void_p
+        x.XGetAtomName.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+        x.XFree.argtypes = [ctypes.c_void_p]
+        x.XkbFreeKeyboard.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int]
+        desc = x.XkbAllocKeyboard()
+        if not desc:
+            return
+        if x.XkbGetNames(self.dpy, 1 << 12, desc) != 0:             # XkbGroupNamesMask
+            x.XkbFreeKeyboard(desc, 0, 1)
+            return
+        names = ctypes.c_void_p.from_address(desc + 48).value       # XkbDescRec.names
+        out = []
+        if names:
+            for i in range(4):                                      # XkbNamesRec.groups[4]
+                atom = ctypes.c_ulong.from_address(names + 424 + 8 * i).value
+                if not atom:
+                    break
+                p = x.XGetAtomName(self.dpy, atom)
+                out.append(ctypes.string_at(p).decode(errors="replace")); x.XFree(p)
+        x.XkbFreeKeyboard(desc, 0, 1)
+        self.layouts = out
+
+    def group(self):
+        if not self.x:
+            return None
+        st = (ctypes.c_ubyte * 32)()          # XkbStateRec; group is the first byte
+        if self.x.XkbGetState(self.dpy, self.CORE, st) != 0:
+            return None
+        return st[0]
+
+    def label(self):
+        g = self.group()
+        if g is None or len(self.layouts) < 2:
+            return None
+        if g >= len(self.layouts):
+            self.reload()
+        name = self.layouts[g] if g < len(self.layouts) else ""
+        return "RU" if name.startswith("Russian") else "EN"
+
+    def screen_blanked(self):
+        """True while xscreensaver has the screen (blanked or locked): the
+        strip must not raise itself over the lock."""
+        if not self.x:
+            return False
+        x = self.x
+        if not hasattr(self, "atom"):
+            x.XInternAtom.restype = ctypes.c_ulong
+            x.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+            x.XDefaultRootWindow.restype = ctypes.c_ulong
+            x.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+            x.XGetWindowProperty.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_long,
+                                             ctypes.c_long, ctypes.c_int, ctypes.c_ulong,
+                                             ctypes.POINTER(ctypes.c_ulong), ctypes.POINTER(ctypes.c_int),
+                                             ctypes.POINTER(ctypes.c_ulong), ctypes.POINTER(ctypes.c_ulong),
+                                             ctypes.POINTER(ctypes.c_void_p)]
+            self.atom = x.XInternAtom(self.dpy, b"_SCREENSAVER_STATUS", 1)
+            self.root = x.XDefaultRootWindow(self.dpy)
+        if not self.atom:
+            return False
+        t, f, n, after, data = ctypes.c_ulong(), ctypes.c_int(), ctypes.c_ulong(), ctypes.c_ulong(), ctypes.c_void_p()
+        if x.XGetWindowProperty(self.dpy, self.root, self.atom, 0, 1, 0, 0,
+                                t, f, n, after, data) != 0 or not data.value:
+            return False
+        blanked = n.value > 0 and ctypes.c_long.from_address(data.value).value != 0
+        x.XFree(data)
+        return blanked
+
+    def toggle(self):
+        g = self.group()
+        if g is not None and self.layouts:
+            self.x.XkbLockGroup(self.dpy, self.CORE, (g + 1) % len(self.layouts))
+            self.x.XFlush(self.dpy)
+
+
 class Status:
     def __init__(self):
         self.r = tk.Tk()
@@ -46,15 +150,17 @@ class Status:
         self.bar = tk.Frame(self.r, bg=PANEL, bd=2, relief="raised")
         self.bar.pack(padx=1, pady=(0, 1))
         self.parts, self.popup = {}, None
-        for key in ("wifi", "bt", "light", "vol", "batt", "clock"):
+        for key in ("wifi", "bt", "light", "vol", "batt", "kb", "clock"):
             lab = tk.Label(self.bar, text="", bg=PANEL, fg=INK, font=FONT_B, padx=8, pady=2, cursor="hand2")
             lab.bind("<Button-1>", lambda e, k=key: self.click(k))
             lab.bind("<Button-3>", lambda e, k=key: self.click(k, right=True))
             self.parts[key] = lab
         self.warned = set()
         self.slow, self.ticks = {}, 0
+        self.kb = Keyboard()
         self.start_watchers()
         self.tick()
+        self.kb_tick()
 
     # --- reading the hardware --------------------------------------------
     # Everything that has to ask another program (NetworkManager, BlueZ,
@@ -154,6 +260,8 @@ class Status:
             text["batt"] = f"▮ {cap}%{sign}"
             self.parts["batt"].configure(fg=RED if cap <= 15 and not sign else INK)
             self.low_battery(cap, state)
+        self.kb.reload()          # layouts can be added or changed (MaXX's keyboard menu)
+        text["kb"] = self.kb.label()
         text["clock"] = time.strftime("%H:%M")
         for key, lab in self.parts.items():
             if text.get(key):
@@ -163,10 +271,30 @@ class Status:
             elif lab.winfo_ismapped():
                 lab.pack_forget()
         self.place()
-        self.r.lift()          # stay above new windows (the window manager doesn't manage it)
-        if self.popup:
-            self.popup.lift()
+        if not self.kb.screen_blanked():
+            self.r.lift()      # stay above new windows (the window manager doesn't manage it)
+            if self.popup:
+                self.popup.lift()
         self.r.after(5000, self.tick)
+
+    def kb_tick_once(self):
+        t = self.kb.label()
+        if t:
+            self.parts["kb"].configure(text=t)
+
+    def kb_tick(self):
+        """The keyboard part changes the moment Alt+Shift is pressed, so it
+        gets its own quicker check."""
+        t = self.kb.label()
+        lab = self.parts["kb"]
+        if t is None and lab.winfo_ismapped():
+            lab.configure(text=""); lab.pack_forget(); self.place()
+        elif t and t != lab.cget("text"):
+            lab.configure(text=t)
+            if not lab.winfo_ismapped():
+                self.repack()
+                self.place()
+        self.r.after(1000, self.kb_tick)
 
     def repack(self):
         for lab in self.parts.values():
@@ -185,14 +313,14 @@ class Status:
         if state != "Discharging":
             self.warned.clear(); return
         for level, title, body in ((15, "Battery low", f"{cap}% left. Time to find the charger."),
-                                   (7, "Battery very low", f"{cap}% left. Plug in soon; Porygon will sleep at 3%.")):
+                                   (7, "Battery very low", f"{cap}% left. Plug in soon; Porygon will hibernate at 3%.")):
             if cap <= level and level not in self.warned:
                 self.warned.add(level)
                 self.notify(title, body, "critical" if level <= 7 else "normal")
         if cap <= 3 and 3 not in self.warned:
             self.warned.add(3)
-            self.notify("Going to sleep", "The battery is almost empty, so Porygon is going to sleep in 20 seconds to keep your work safe.", "critical")
-            bg("sh", "-c", "sleep 20; systemctl suspend")
+            self.notify("Going to sleep", "The battery is almost empty, so Porygon will hibernate in 20 seconds to keep your work safe.", "critical")
+            bg("sh", "-c", "sleep 20; systemctl hibernate || systemctl suspend")
 
     def notify(self, title, body, urgency="normal"):
         """A notification (MaXX's dunst); a nudge window if notifications aren't running."""
@@ -237,7 +365,9 @@ class Status:
             self.close_popup(); return
         self.open_key = key
         lab = self.parts[key]
-        if key == "wifi":
+        if key == "kb":
+            self.close_popup(); self.kb.toggle(); self.r.after(50, self.kb_tick_once)
+        elif key == "wifi":
             self.close_popup(); bg("porygon-wifi")
         elif key == "bt":
             self.close_popup()

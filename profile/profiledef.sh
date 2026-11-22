@@ -48,6 +48,7 @@ file_permissions=(
   ["/usr/local/bin/porygon-installer"]="0:0:755"
   ["/usr/local/bin/porygon-status"]="0:0:755"
   ["/usr/local/bin/porygon-wifi"]="0:0:755"
+  ["/usr/local/bin/porygon-screenshot"]="0:0:755"
   ["/usr/local/bin/porygon-compositor"]="0:0:755"
   ["/usr/local/bin/porygon-osd"]="0:0:755"
   ["/usr/lib/porygon/snapshot-check"]="0:0:755"

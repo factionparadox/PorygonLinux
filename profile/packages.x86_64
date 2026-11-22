@@ -91,6 +91,8 @@ vulkan-intel
 intel-media-driver
 xterm
 xbindkeys
+scrot
+focuswriter
 # --- MaXX runtime (from its AUR PKGBUILD) ---
 openmotif
 libxp

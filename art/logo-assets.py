@@ -129,6 +129,54 @@ os.makedirs(os.path.join(share, "installer"), exist_ok=True)
 wizard_banner().resize((164, 390), Image.LANCZOS).convert("RGB").save(os.path.join(share, "installer", "banner.png"))
 fit(logo, 48).save(os.path.join(share, "installer", "header.png"))
 
+# FocusWriter: a Porygon theme - the low-poly backdrop behind a pale page
+fw = os.path.join(prof, "airootfs/usr/share/focuswriter/themes")
+os.makedirs(fw, exist_ok=True)
+subprocess.run([sys.executable, os.path.join(here, "wallpaper.py"), os.path.join(fw, "_porygon.png"), "1920", "1200", "11"], check=True)
+os.makedirs(os.path.join(fw, "images"), exist_ok=True)
+Image.open(os.path.join(fw, "_porygon.png")).convert("RGB").save(os.path.join(fw, "images", "porygon.jpg"), quality=88)
+os.remove(os.path.join(fw, "_porygon.png"))
+open(os.path.join(fw, "porygon.theme"), "w").write("""[General]
+LoadColor=#3a2846
+
+[Background]
+Color=#3a2846
+ImageFile=porygon.jpg
+Type=5
+
+[Foreground]
+Color=#fbf8fc
+Margin=65
+Opacity=92
+Padding=24
+Position=1
+Rounding=4
+RoundingDisabled=10
+Width=760
+
+[ForegroundBlur]
+Enabled=false
+Radius=32
+
+[ForegroundShadow]
+Color=#1a1020
+Enabled=true
+Offset=4
+Radius=12
+
+[Spacings]
+IndentFirstLine=false
+LineSpacing=120
+ParagraphAbove=0
+ParagraphBelow=10
+TabWidth=48
+
+[Text]
+Color=#1a1020
+Font="DejaVu Serif,12,-1,5,50,0,0,0,0,0"
+Misspelled=#b04a68
+""")
+
 # Limine (the installed system's boot menu): the backdrop without the title,
 # since Limine prints its branding line and the menu over the left side
 lim = os.path.join(prof, "airootfs/usr/share/porygon/limine")
@@ -165,6 +213,22 @@ os.makedirs(pt, exist_ok=True)
 backdrop(1920, 1200, tagline=False).convert("RGB").save(os.path.join(pt, "background.png"))
 for name, col in (("dot-off.png", BLUE_DARK), ("dot-on.png", PINK_LIGHT)):
     dot = Image.new("RGBA", (36, 36)); ImageDraw.Draw(dot).ellipse([4, 4, 32, 32], fill=col + (255,)); dot.save(os.path.join(pt, name))
+# the disk-password box: a bevelled panel like the System Manager's, a pink
+# title bar, and a sunken field the bullets are drawn into by the script
+PW, PH = 460, 132
+pan = Image.new("RGB", (PW, PH), (217, 211, 221)); d = ImageDraw.Draw(pan)
+d.rectangle([0, 0, PW - 1, PH - 1], outline=PINK_DARK)
+d.line([(1, 1), (PW - 2, 1)], fill=(251, 248, 252), width=2); d.line([(1, 1), (1, PH - 2)], fill=(251, 248, 252), width=2)
+d.line([(1, PH - 2), (PW - 2, PH - 2)], fill=(138, 127, 144), width=2); d.line([(PW - 2, 1), (PW - 2, PH - 2)], fill=(138, 127, 144), width=2)
+d.rectangle([4, 4, PW - 5, 34], fill=PINK)
+d.text((14, 9), "Unlock the disk", font=font("DejaVuSans-Bold.ttf", 16), fill=(26, 16, 32))
+d.text((18, 50), "Password:", font=font("DejaVuSans-Bold.ttf", 14), fill=(26, 16, 32))
+FX0, FY0, FX1, FY1 = 110, 44, PW - 18, 76
+d.rectangle([FX0, FY0, FX1, FY1], fill=(251, 248, 252))
+d.line([(FX0, FY0), (FX1, FY0)], fill=(138, 127, 144), width=2); d.line([(FX0, FY0), (FX0, FY1)], fill=(138, 127, 144), width=2)
+d.text((18, 96), "One password, then straight to the desktop.", font=font("DejaVuSans-Oblique.ttf", 13), fill=(70, 56, 80))
+pan.save(os.path.join(pt, "password.png"))
+
 open(os.path.join(pt, "porygon.plymouth"), "w").write("""[Plymouth Theme]
 Name=Porygon
 Description=Porygon boot splash
@@ -205,6 +269,27 @@ fun message_cb(text) {
     msg.SetImage(img); msg.SetX(W / 2 - img.GetWidth() / 2);
 }
 Plymouth.SetMessageFunction(message_cb);
+
+// the disk password: the panel, with a bullet per key typed
+pw = Image("password.png");
+pw = pw.Scale(pw.GetWidth() * scale * 1.25, pw.GetHeight() * scale * 1.25);
+ps = 1.25 * scale;
+px = W / 2 - pw.GetWidth() / 2; py = H * 0.58;
+panel = Sprite(pw); panel.SetPosition(px, py, 10); panel.SetOpacity(0);
+dotsx = Sprite(); dotsx.SetPosition(px + 120 * ps, py + 48 * ps, 11);
+fun password_cb(prompt, bullets) {
+    panel.SetOpacity(1);
+    b = "";
+    for (i = 0; i < bullets && i < 22; i++) b = b + "* ";
+    if (b == "") { dotsx.SetOpacity(0); }
+    else {
+        dotsx.SetImage(Image.Text(b, 0.10, 0.06, 0.13, 1, "Sans Bold " + Math.Int(13 * ps)));
+        dotsx.SetOpacity(1);
+    }
+}
+fun normal_cb() { panel.SetOpacity(0); dotsx.SetOpacity(0); }
+Plymouth.SetDisplayPasswordFunction(password_cb);
+Plymouth.SetDisplayNormalFunction(normal_cb);
 """)
 
 # fastfetch: its own picture (art/fastfetch.png) turned into true-colour

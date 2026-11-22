@@ -1,0 +1,11 @@
+#!/bin/sh
+# Print: the whole screen.  Shift+Print: drag out a region (or click a window).
+# Saved to ~/Pictures with the date in the name.
+dir="$HOME/Pictures"; mkdir -p "$dir"
+f="$dir/Screenshot-$(date +%Y-%m-%d-%H%M%S).png"
+case $1 in
+    region) scrot -s -f "$f" || exit 0 ;;
+    *)      scrot "$f" || exit 1 ;;
+esac
+PATH=$PATH:/opt/MaXX/bin64 dunstify -a Screenshot -i camera-photo -r 4747 "Screenshot saved" "${f#$HOME/}" 2>/dev/null \
+    || notify-send "Screenshot saved" "${f#$HOME/}"

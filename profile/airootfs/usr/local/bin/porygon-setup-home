@@ -151,11 +151,19 @@ MENU
 	"Porygon Colours"	f.exec "porygon-theme on"
 	"SGI Colours"		f.exec "porygon-theme off"
 	"Start-up Chime"	f.exec "porygon-chime"
+	separator		f.separator
+	"Lock Screen"		f.exec "xscreensaver-command -lock"
+	"Sleep"			f.exec "systemctl suspend"
+MENU
+    # only where the installer set up a swap file big enough to hibernate into
+    grep -q 'resume=' /proc/cmdline && printf '\t"Hibernate"\t\tf.exec "systemctl hibernate"\n'
+    cat <<MENU
 }
 
 Menu Apps
 {
 	"Web Browser"		f.exec "firefox"
+	"Writer"		f.exec "focuswriter"
 	"Music Player"		f.exec "qmmp"
 	"IRC Chat"		f.exec "$W irssi"
 	"Text Editor"		f.exec "/opt/MaXX/bin/xnedit"
@@ -246,6 +254,15 @@ GI=$HOME/.config/rox.sourceforge.net/ROX-Filer/globicons
 if [ -f "$PB" ] && ! grep -q porygon-welcome "$PB"; then
     sed -i 's|</pinboard>|  <icon x="224" y="32" label="Welcome">/usr/local/bin/porygon-welcome</icon>\n  <icon x="224" y="160" label="Demos">/usr/local/bin/porygon-demos-folder</icon>\n  <icon x="224" y="288" label="Whats New">/usr/local/bin/porygon-evolved</icon>\n</pinboard>|' "$PB"
 fi
+# a winterm icon (the welcome page points at it), and "What's New" with its apostrophe
+if [ -f "$PB" ]; then
+    grep -q 'label="Whats New"' "$PB" && sed -i "s|label=\"Whats New\"|label=\"What's New\"|" "$PB"
+    grep -q '/opt/MaXX/bin/winterm' "$PB" ||
+        sed -i 's|</pinboard>|  <icon x="224" y="416" label="winterm">/opt/MaXX/bin/winterm</icon>\n</pinboard>|' "$PB"
+fi
+if [ -f "$GI" ] && ! grep -q '/opt/MaXX/bin/winterm' "$GI"; then
+    sed -i "s|</special-files>|  <rule match=\"/opt/MaXX/bin/winterm\">\n    <icon>/opt/MaXX/share/icons/Irix/scalable/apps/app-winterm.svg</icon>\n  </rule>\n</special-files>|" "$GI"
+fi
 # on the live USB: an Install Porygon icon
 if [ -d /run/archiso ] && [ -f "$PB" ] && ! grep -q porygon-installer "$PB"; then
     sed -i 's|</pinboard>|  <icon x="352" y="32" label="Install Porygon">/usr/local/bin/porygon-installer</icon>\n</pinboard>|' "$PB"
@@ -254,6 +271,57 @@ WICON=$SHARE/icons/welcome-128.png
 [ -f "$SHARE/icons/logo-128.png" ] && WICON=$SHARE/icons/logo-128.png   # the distro logo, if built in
 if [ -f "$GI" ] && ! grep -q porygon-welcome "$GI"; then
     sed -i "s|</special-files>|  <rule match=\"/usr/local/bin/porygon-welcome\">\n    <icon>$WICON</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-demos-folder\">\n    <icon>$SHARE/icons/demos-128.png</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-installer\">\n    <icon>$WICON</icon>\n  </rule>\n  <rule match=\"/usr/local/bin/porygon-evolved\">\n    <icon>$SHARE/icons/evolve-128.png</icon>\n  </rule>\n</special-files>|" "$GI"
+fi
+
+# --- screen lock: blank at 10 minutes, lock, then GL demos of the era -------
+# The demos are the SGI-era GL ones; the rest of the catalogue is listed but off.
+if [ ! -f "$HOME/.xscreensaver" ]; then
+    XV=$(pacman -Q xscreensaver 2>/dev/null | sed 's/.* \([0-9.]*\).*/\1/')
+    {
+    echo "# XScreenSaver Preferences File"
+    echo "# Written by xscreensaver-settings ${XV:-6.15} for $USER on $(date '+%a %b %e %H:%M:%S %Y')."
+    echo
+    cat <<'XSS'
+mode:		random
+timeout:	0:10:00
+cycle:		0:05:00
+lock:		True
+lockTimeout:	0:00:00
+dpmsEnabled:	True
+dpmsQuickOff:	True
+dpmsStandby:	0:15:00
+dpmsSuspend:	0:20:00
+dpmsOff:	0:30:00
+splash:		False
+fade:		True
+unfade:		True
+fadeSeconds:	0:00:02
+dialogTheme:	default
+programs:								      \
+  GL:		atlantis --count 4 --root			    \n\
+  GL:		pipes --root					    \n\
+  GL:		superquadrics --root				    \n\
+  GL:		sproingies --root				    \n\
+  GL:		molecule --root					    \n\
+  GL:		morph3d --root					    \n\
+XSS
+    # every other installed hack, switched off (left out, xscreensaver adds them back on)
+    for x in /usr/share/xscreensaver/config/*.xml; do
+        n=$(basename "$x" .xml)
+        case " atlantis pipes superquadrics sproingies molecule morph3d " in *" $n "*) continue ;; esac
+        grep -q '<screensaver ' "$x" || continue
+        if grep -q 'gl="yes"' "$x"; then g='- GL:'; else g='-'; fi
+        printf '%s\t\t%s --root\t\t\t\t    \\n\\\n' "$g" "$n"
+    done
+    echo
+    } > "$HOME/.xscreensaver"
+fi
+
+# --- FocusWriter (Writer): the Porygon page, British spelling ---------------
+FW=$HOME/.config/GottCode/FocusWriter.conf
+if [ ! -f "$FW" ]; then
+    mkdir -p "${FW%/*}"
+    printf '[ThemeManager]\nTheme=porygon\nThemeDefault=true\n\n[Spelling]\nLanguage=en_GB\n\n[Window]\nFullscreen=true\n' > "$FW"
 fi
 
 # (Firefox gets its 1990s look from /usr/lib/firefox/browser/defaults/profile,

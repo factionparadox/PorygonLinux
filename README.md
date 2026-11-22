@@ -69,6 +69,16 @@ British English and Russian, offline dictionaries) and an offline Russian course
   Firefox restyled with square bevelled toolbars and a pink tab (via
   autoconfig, so every profile gets it once; edit the profile's
   `chrome/userChrome.css` to change it).
+- **Writer:** FocusWriter (Toolchest → Apps → Writer), full screen, a pale
+  page over the low-poly backdrop, British spelling (Russian dictionary too).
+- **Keyboard:** English and Russian, Alt+Shift to switch; the status strip
+  shows EN or RU (click it to switch). Volume, brightness, mic and media keys
+  work, with an on-screen bar; Print saves a screenshot to `~/Pictures`
+  (Shift+Print: a region or a window).
+- **Screen lock:** xscreensaver blanks the screen after 10 minutes and locks
+  it, also on sleep and lid close. Super+L or Toolchest → Porygon → Lock
+  Screen locks it now. While it waits, it runs the period GL demos (Atlantis,
+  Pipes, Sproingies...).
 - **Wellbeing:** a night light in the evening, a gentle "rest your eyes?"
   after about 50 minutes at the keyboard (time away counts, so it never nags
   twice), one bedtime reminder with rain and a sleep timer, and a breathing
@@ -129,6 +139,12 @@ inside a clean Manjaro chroot (`gtk2` takes the longest); later builds reuse the
   user, region, a summary, then a progress bar. `sudo porygon-install` does the
   same in a terminal. It's UEFI-only and erases the disk you choose: 2 GiB EFI partition (Limine and the
   kernels, including one per snapshot), the rest Btrfs.
+- Disk encryption (on by default): the Btrfs part is LUKS2. You type the
+  password once, at the boot splash; the desktop then logs you in by itself.
+- Hibernation: when the disk has room (40 GB more than the RAM), the swap file
+  is as big as the RAM, closing the lid sleeps and then hibernates after two
+  hours, and the battery hibernates the machine at 3%. Toolchest → Porygon →
+  Hibernate does it now. Otherwise there's a 4 GB swap file and no hibernation.
 - Wi-Fi: `nmtui` in a terminal.
 
 ## Commands

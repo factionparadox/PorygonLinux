@@ -64,6 +64,8 @@ PAGES = [
         "  •  Toolchest → Demos, for the polygons",
         "  •  Double-click winterm on the desktop for a shell",
         "  •  Right-click the desktop for the background menu",
+        "  •  Toolchest → Apps → Writer, for a quiet page to write on",
+        "  •  Alt+Shift switches between English and Russian (EN/RU on the strip)",
     ], [("Show the Toolchest's Demos", lambda: show("demos"))]),
     ("network", "Network", "Connect to Wi-Fi", [
         "The strip at the top of the screen shows your network, Bluetooth, "

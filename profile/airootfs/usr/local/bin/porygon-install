@@ -31,7 +31,7 @@ fi
 [ ${#disks[@]} -gt 0 ] || die "No disks found to install to."
 
 if [ $MODE = batch ]; then
-    : "${DISK:?}" "${USERNAME:?}" "${HOST:=porygon}" "${TZONE:=Europe/London}" "${KB:=gb}"
+    : "${DISK:?}" "${USERNAME:?}" "${HOST:=porygon}" "${TZONE:=Europe/London}" "${KB:=gb}" "${ENCRYPT:=no}"
     IFS= read -r PW1
     printf '%s\n' "${disks[@]}" | grep -qx "$DISK" || die "$DISK isn't a disk Porygon can install to."
     [[ $USERNAME =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "Usernames are lowercase letters, numbers, - and _."
@@ -64,6 +64,8 @@ TZ_DEFAULT=$(readlink /etc/localtime | sed 's|.*/zoneinfo/||'); [ "$TZ_DEFAULT" 
 read -rp "   Time zone [$TZ_DEFAULT]: " TZONE; TZONE=${TZONE:-$TZ_DEFAULT}
 [ -f "/usr/share/zoneinfo/$TZONE" ] || die "Unknown time zone '$TZONE'."
 read -rp "   Keyboard layout [gb]: " KB; KB=${KB:-gb}
+read -rp "   Encrypt the disk? Your password unlocks it at start-up [Y/n]: " ENCRYPT
+[[ ${ENCRYPT,,} == n* ]] && ENCRYPT=no || ENCRYPT=yes
 
 echo
 printf '\e[1;31m   EVERYTHING on %s (%s) will be erased.\e[0m\n' "$DISK" "$(lsblk -dno SIZE "$DISK" | xargs)"
@@ -74,6 +76,7 @@ fi
 # --- partition ---
 STEP_PCT=2 say "Partitioning $DISK"
 umount -R /mnt 2>/dev/null || true
+cryptsetup close cryptroot 2>/dev/null || true
 wipefs -af "$DISK" >/dev/null
 sgdisk -Z "$DISK" >/dev/null
 sgdisk -n1:0:+2G -t1:ef00 -c1:EFI -n2:0:0 -t2:8304 -c2:porygon "$DISK" >/dev/null
@@ -81,19 +84,39 @@ partprobe "$DISK"; udevadm settle
 part() { lsblk -lpno NAME "$DISK" | sed -n "$(( $1 + 1 ))p"; }
 ESP=$(part 1); ROOT=$(part 2)
 mkfs.fat -F32 -n EFI "$ESP" >/dev/null
-mkfs.btrfs -f -L porygon "$ROOT" >/dev/null
+# encryption: LUKS2 with your password, so one password at start-up (the
+# desktop then logs you in by itself). The kernels on the EFI partition are
+# the only unencrypted part.
+if [ "$ENCRYPT" = yes ]; then
+    STEP_PCT=4 say "Encrypting the disk"
+    printf '%s' "$PW1" | cryptsetup luksFormat -q --type luks2 --pbkdf argon2id "$ROOT" -d -
+    printf '%s' "$PW1" | cryptsetup open "$ROOT" cryptroot -d -
+    LUKS_UUID=$(blkid -s UUID -o value "$ROOT")
+    FS=/dev/mapper/cryptroot
+else
+    FS=$ROOT
+fi
+mkfs.btrfs -f -L porygon "$FS" >/dev/null
 modprobe -q btrfs || true
 udevadm settle
-# subvolumes: the system, your home, logs and the package cache. Snapshots
-# cover only @, so rolling back never touches your files or loses logs.
-mount -t btrfs "$ROOT" /mnt
-for sv in @ @home @log @pkg; do btrfs -q subvolume create "/mnt/$sv"; done
+# subvolumes: the system, your home, logs, the package cache and the swap
+# file. Snapshots cover only @, so rolling back never touches your files.
+mount -t btrfs "$FS" /mnt
+for sv in @ @home @log @pkg @swap; do btrfs -q subvolume create "/mnt/$sv"; done
 umount /mnt
 OPTS=noatime,compress=zstd:1
-mount -t btrfs -o subvol=/@,$OPTS "$ROOT" /mnt
-mount --mkdir -t btrfs -o subvol=/@home,$OPTS "$ROOT" /mnt/home
-mount --mkdir -t btrfs -o subvol=/@log,$OPTS "$ROOT" /mnt/var/log
-mount --mkdir -t btrfs -o subvol=/@pkg,$OPTS "$ROOT" /mnt/var/cache/pacman/pkg
+mount -t btrfs -o subvol=/@,$OPTS "$FS" /mnt
+mount --mkdir -t btrfs -o subvol=/@home,$OPTS "$FS" /mnt/home
+mount --mkdir -t btrfs -o subvol=/@log,$OPTS "$FS" /mnt/var/log
+mount --mkdir -t btrfs -o subvol=/@pkg,$OPTS "$FS" /mnt/var/cache/pacman/pkg
+mount --mkdir -t btrfs -o subvol=/@swap,noatime "$FS" /mnt/swap
+# swap the size of your memory, so the computer can hibernate - if the disk
+# has room for it with at least 40 GB to spare; otherwise 4 GB, no hibernation
+RAM_G=$(awk '/MemTotal/ { printf "%d", ($2 / 1048576) + 0.999 }' /proc/meminfo)
+DISK_G=$(( $(blockdev --getsize64 "$DISK") / 1073741824 ))
+if [ $(( DISK_G - RAM_G )) -ge 40 ]; then SWAP_G=$RAM_G; HIBERNATE=yes; else SWAP_G=4; HIBERNATE=no; fi
+btrfs filesystem mkswapfile --size "${SWAP_G}g" --uuid clear /mnt/swap/swapfile >/dev/null
+RESUME_OFFSET=$(btrfs inspect-internal map-swapfile -r /mnt/swap/swapfile)
 mount --mkdir -t vfat -o umask=0077 "$ESP" /mnt/boot
 
 # --- copy the live system ---
@@ -122,6 +145,7 @@ sed -i '/^porygon:/d' /mnt/etc/passwd /mnt/etc/shadow
 sed -i '/^porygon:/d' /mnt/etc/group /mnt/etc/gshadow
 sed -i 's/,porygon//; s/:porygon$/:/' /mnt/etc/group /mnt/etc/gshadow
 genfstab -U /mnt > /mnt/etc/fstab
+echo "/swap/swapfile none swap defaults 0 0" >> /mnt/etc/fstab
 echo "$HOST" > /mnt/etc/hostname
 printf '\n  PORYGON  -  a 1990s workstation, rendered in polygons\n  upgrade: update the system    dubious-disc: update MaXX too\n  Manjaro edition: aged two weeks, like a fine cheese\n\n' > /mnt/etc/motd
 ln -sf "/usr/share/zoneinfo/$TZONE" /mnt/etc/localtime
@@ -131,12 +155,14 @@ case $KB in gb) CONSOLE_KB=uk ;; *) CONSOLE_KB=$KB ;; esac
 echo "KEYMAP=$CONSOLE_KB" > /mnt/etc/vconsole.conf
 echo "LANG=en_GB.UTF-8" > /mnt/etc/locale.conf
 sed -i 's/^#\(en_GB.UTF-8\)/\1/; s/^#\(en_US.UTF-8\)/\1/' /mnt/etc/locale.gen
+case $KB in ru*) XKB=$KB ;; *) XKB="$KB,ru" ;; esac
 mkdir -p /mnt/etc/X11/xorg.conf.d
 cat > /mnt/etc/X11/xorg.conf.d/00-keyboard.conf <<KBD
 Section "InputClass"
     Identifier "keyboard"
     MatchIsKeyboard "on"
-    Option "XkbLayout" "$KB"
+    Option "XkbLayout" "$XKB"
+    Option "XkbOptions" "grp:alt_shift_toggle"
 EndSection
 KBD
 mkdir -p /mnt/etc/systemd/system/getty@tty1.service.d
@@ -168,17 +194,26 @@ fi
 
 # --- boot: Limine with Porygon's theme, kernels on the EFI partition ---
 STEP_PCT=80 say "Setting up the boot menu and snapshots"
-UUID=$(blkid -s UUID -o value "$ROOT")
-cat > /mnt/etc/mkinitcpio.conf.d/porygon.conf <<'HOOKS'
-# Porygon: boot splash early; btrfs-overlayfs lets a read-only snapshot boot
-# with a temporary writable layer on top
-HOOKS=(base udev plymouth autodetect microcode modconf kms keyboard keymap block filesystems btrfs-overlayfs)
+UUID=$(blkid -s UUID -o value "$FS")
+CMDLINE="root=UUID=$UUID rootflags=subvol=/@ rw"
+ENC_HOOK=
+if [ "$ENCRYPT" = yes ]; then
+    CMDLINE="cryptdevice=UUID=$LUKS_UUID:cryptroot root=/dev/mapper/cryptroot rootflags=subvol=/@ rw"
+    ENC_HOOK=encrypt
+fi
+[ "$HIBERNATE" = yes ] && CMDLINE="$CMDLINE resume=$( [ "$ENCRYPT" = yes ] && echo /dev/mapper/cryptroot || echo UUID=$UUID ) resume_offset=$RESUME_OFFSET"
+CMDLINE="$CMDLINE quiet splash loglevel=3"
+cat > /mnt/etc/mkinitcpio.conf.d/porygon.conf <<HOOKS
+# Porygon: boot splash early (it also asks for the disk password); resume
+# wakes from hibernation; btrfs-overlayfs lets a read-only snapshot boot with
+# a temporary writable layer on top
+HOOKS=(base udev plymouth autodetect microcode modconf kms keyboard keymap block $ENC_HOOK resume filesystems btrfs-overlayfs)
 HOOKS
 cat > /mnt/etc/default/limine <<LIMINE
 # Porygon's Limine settings (see /etc/limine-entry-tool.conf for every option)
 TARGET_OS_NAME="Porygon"
 ESP_PATH="/boot"
-KERNEL_CMDLINE[default]="root=UUID=$UUID rootflags=subvol=/@ rw quiet splash loglevel=3"
+KERNEL_CMDLINE[default]="$CMDLINE"
 ENABLE_LIMINE_FALLBACK=yes
 # the kernel first (it's the default), then the snapshots
 BOOT_ORDER="*, *fallback, Snapshots"
@@ -188,6 +223,12 @@ LIMINE
 mkdir -p /mnt/boot/porygon
 cp /usr/share/porygon/limine/background.png /mnt/boot/porygon/
 cp /usr/share/porygon/limine/theme.conf /mnt/boot/limine.conf
+# lid closed: sleep, then hibernate after two hours (if there's room to hibernate)
+if [ "$HIBERNATE" = yes ]; then
+    mkdir -p /mnt/etc/systemd/logind.conf.d /mnt/etc/systemd/sleep.conf.d
+    printf '[Login]\nHandleLidSwitch=suspend-then-hibernate\n' > /mnt/etc/systemd/logind.conf.d/porygon-lid.conf
+    printf '[Sleep]\nHibernateDelaySec=2h\n' > /mnt/etc/systemd/sleep.conf.d/porygon.conf
+fi
 # Porygon's own sudo rule: graphical admin tools (Btrfs Assistant) keep the display
 echo 'Defaults env_keep += "DISPLAY XAUTHORITY"' > /mnt/etc/sudoers.d/20-display
 chmod 440 /mnt/etc/sudoers.d/20-display
@@ -219,4 +260,5 @@ grep -q 'protocol: linux' /mnt/boot/limine.conf || die "Couldn't set up the boot
 
 sync
 umount -R /mnt
+[ "$ENCRYPT" = yes ] && cryptsetup close cryptroot 2>/dev/null
 STEP_PCT=100 say "Done. Remove the USB and reboot - you'll land straight in the desktop."

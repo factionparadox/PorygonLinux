@@ -10,3 +10,21 @@
     XF86AudioMute
 "porygon-osd mic mute"
     XF86AudioMicMute
+"qmmp --play-pause"
+    XF86AudioPlay
+"qmmp --pause"
+    XF86AudioPause
+"qmmp --next"
+    XF86AudioNext
+"qmmp --previous"
+    XF86AudioPrev
+"qmmp --stop"
+    XF86AudioStop
+"porygon-screenshot"
+    Print
+"porygon-screenshot region"
+    Shift + Print
+"xscreensaver-command -lock"
+    Mod4 + l
+"xscreensaver-command -lock"
+    XF86ScreenSaver

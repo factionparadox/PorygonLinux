@@ -1,0 +1,19 @@
+! Porygon colours for the xscreensaver unlock dialog (merged by the session)
+xscreensaver-auth.default.Dialog.foreground:		#1a1020
+xscreensaver-auth.default.Dialog.background:		#d9d3dd
+xscreensaver-auth.default.Dialog.button.foreground:	#1a1020
+xscreensaver-auth.default.Dialog.button.background:	#ec849d
+xscreensaver-auth.default.Dialog.logo.background:	#5496ce
+xscreensaver-auth.default.Dialog.text.foreground:	#1a1020
+xscreensaver-auth.default.Dialog.text.background:	#fbf8fc
+xscreensaver-auth.default.Dialog.error.foreground:	#b02030
+xscreensaver-auth.default.Dialog.topShadowColor:		#fbf8fc
+xscreensaver-auth.default.Dialog.bottomShadowColor:	#8a7f90
+xscreensaver-auth.default.Dialog.thermometer.foreground:	#ec849d
+xscreensaver-auth.default.Dialog.thermometer.background:	#fbf8fc
+xscreensaver-auth.default.Dialog.borderColor:		#b04a68
+xscreensaver-auth.default.Dialog.borderWidth:		2
+xscreensaver-auth.?.Dialog.headingFont:	sans-serif bold 15
+xscreensaver-auth.?.Dialog.bodyFont:	sans-serif 12
+xscreensaver-auth.?.Dialog.labelFont:	sans-serif bold 12
+xscreensaver-auth.?.Dialog.buttonFont:	sans-serif bold 12
