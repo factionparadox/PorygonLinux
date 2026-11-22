@@ -297,7 +297,7 @@ Plymouth.SetDisplayNormalFunction(normal_cb);
 FF = Image.open(ff_path).convert("RGBA")
 bb = FF.getchannel("A").getbbox()
 if bb: FF = FF.crop(bb)
-cols = 34
+cols = 26   # narrow enough that logo + info fit an 80-column winterm
 rows2 = max(2, round(FF.height / FF.width * cols * 0.95)) // 2 * 2   # two pixel rows per text row
 px = FF.resize((cols, rows2), Image.LANCZOS)
 lines = []
@@ -321,7 +321,12 @@ os.makedirs(ff, exist_ok=True)
 json.dump({
     "logo": {"type": "file-raw", "source": "/usr/local/share/porygon/fastfetch-logo.txt", "padding": {"right": 2}},
     "display": {"color": {"keys": "magenta", "title": "blue"}, "separator": "  "},
+    # kept short so nothing wraps in an 80-column winterm
     "modules": ["title", "separator", "os", "kernel", "uptime", "packages", "shell", "wm", "terminal",
-                "cpu", "gpu", "memory", "disk", "battery", "break", "colors"]},
+                {"type": "cpu", "format": "{name} ({cores-logical})"},
+                {"type": "gpu", "format": "{name}"},
+                "memory",
+                {"type": "disk", "folders": "/", "format": "{size-used} / {size-total} ({size-percentage})"},
+                "battery", "break", "colors"]},
     open(os.path.join(ff, "config.jsonc"), "w"), indent=2)
 print("logo assets ready")

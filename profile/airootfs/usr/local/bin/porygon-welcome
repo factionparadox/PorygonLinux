@@ -196,6 +196,7 @@ root.minsize(680, 480)
 root.option_add("*Font", FONT)
 root.option_add("*Background", BG)
 root.option_add("*Foreground", INK)
+root.option_add("*activeForeground", INK)   # MaXX's X resources make it near-white
 root.option_add("*activeBackground", FIELD)
 root.option_add("*highlightThickness", 0)
 
