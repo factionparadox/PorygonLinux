@@ -1,0 +1,37 @@
+# Porygon's start-up list. Like Tachyon's boot set: only what this computer
+# needs starts at boot, and everything else stays off (the last line) until
+# you switch it on yourself (sudo systemctl enable --now NAME).
+# Read by systemctl preset when packages are installed, and by porygon-install.
+
+# the basics
+enable dbus-broker.service
+enable dbus.service
+enable getty@.service
+enable systemd-timesyncd.service
+enable systemd-resolved.service
+enable systemd-userdbd.socket
+enable remote-fs.target
+# network and Bluetooth
+enable NetworkManager.service
+enable NetworkManager-dispatcher.service
+enable bluetooth.service
+# power and heat
+enable power-profiles-daemon.service
+enable thermald.service
+enable porygon-power-source.service
+enable upower.service
+# (Ollama is not here: Porygon-Z and the Russian tutor start it when you use them)
+# snapshots and updates
+enable limine-snapper-sync.service
+enable snapper-cleanup.timer
+enable pamac-offline-upgrade.service
+enable pamac-cleancache.timer
+# SSD care, once a week
+enable fstrim.timer
+
+# off even though their packages switch them on
+disable man-db.timer
+disable pamac-mirrorlist.timer
+disable snapper-timeline.timer
+
+disable *

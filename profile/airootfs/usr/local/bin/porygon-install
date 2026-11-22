@@ -205,6 +205,12 @@ limine-mkinitcpio >/dev/null 2>&1
 # snap-pac takes one before and after every update
 snapper --no-dbus -c root create-config /
 sed -i 's/^TIMELINE_CREATE=.*/TIMELINE_CREATE="no"/; s/^NUMBER_LIMIT=.*/NUMBER_LIMIT="10"/; s/^NUMBER_LIMIT_IMPORTANT=.*/NUMBER_LIMIT_IMPORTANT="5"/' /etc/snapper/configs/root
+# only Porygon's start-up list (/etc/systemd/system-preset/10-porygon.preset)
+systemctl preset-all >/dev/null 2>&1 || true
+systemctl disable man-db.timer pamac-mirrorlist.timer snapper-timeline.timer >/dev/null 2>&1 || true
+# do the first-boot housekeeping now (library cache, update stamps), so the
+# first start isn't ten seconds slower than every other one
+ldconfig; touch /etc/.updated /var/.updated
 systemctl enable limine-snapper-sync.service snapper-cleanup.timer >/dev/null 2>&1
 snapper --no-dbus -c root create -d "Porygon installed" -c number
 limine-snapper-sync >/dev/null 2>&1 || true

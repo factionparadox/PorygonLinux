@@ -1,0 +1,10 @@
+// Porygon: the person at the computer may start and stop Ollama (Porygon-Z
+// and the Russian tutor start it on first use) without a password.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "ollama.service" &&
+        (action.lookup("verb") == "start" || action.lookup("verb") == "stop") &&
+        subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});

@@ -8,7 +8,7 @@
 In a conversation:  /breathe  a minute of slow breathing    /bye (or Ctrl+D)  leave
 Nothing is kept unless you choose --journal (it then goes to ~/.local/share/porygon/porygon-z).
 """
-import argparse
+import subprocess, argparse
 import datetime
 import json
 import os
@@ -66,6 +66,7 @@ def chat(messages: list, out) -> str:
     req = urllib.request.Request(API, data=body, headers={'Content-Type': 'application/json'})
     reply = []
     try:
+        subprocess.run(['/usr/lib/porygon/ollama-up'], check=False)  # starts Ollama on first use
         with urllib.request.urlopen(req, timeout=600) as resp:
             for line in resp:
                 if not line.strip():
@@ -85,7 +86,7 @@ def chat(messages: list, out) -> str:
             raise RuntimeError(f"Porygon-Z's model isn't here yet: sudo porygon-content install porygon-z") from exc
         raise RuntimeError(f'Ollama said {exc.code}: {exc.reason}') from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError('Ollama is not running: sudo systemctl start ollama') from exc
+        raise RuntimeError('Ollama could not be started: sudo systemctl start ollama') from exc
     return ''.join(reply).strip()
 
 

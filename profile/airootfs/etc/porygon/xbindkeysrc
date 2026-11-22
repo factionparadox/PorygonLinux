@@ -1,12 +1,12 @@
-"brightnessctl -q set +5%"
+"porygon-osd light up"
     XF86MonBrightnessUp
-"brightnessctl -q set 5%-"
+"porygon-osd light down"
     XF86MonBrightnessDown
-"pamixer -i 5"
+"porygon-osd vol up"
     XF86AudioRaiseVolume
-"pamixer -d 5"
+"porygon-osd vol down"
     XF86AudioLowerVolume
-"pamixer -t"
+"porygon-osd vol mute"
     XF86AudioMute
-"pamixer --default-source -t"
+"porygon-osd mic mute"
     XF86AudioMicMute

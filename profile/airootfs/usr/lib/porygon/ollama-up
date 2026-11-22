@@ -1,0 +1,10 @@
+#!/bin/sh
+# ollama-up - start Ollama if it isn't running, and wait until it answers.
+# Ollama doesn't start at boot (it would sit in memory doing nothing); Porygon-Z
+# and the Russian tutor call this first. The polkit rule
+# /etc/polkit-1/rules.d/50-porygon-ollama.rules lets you start it without a password.
+up() { python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:11434/api/version', timeout=2)" 2>/dev/null; }
+up && exit 0
+systemctl start ollama.service 2>/dev/null || sudo -n systemctl start ollama.service 2>/dev/null || exit 1
+for _ in $(seq 40); do up && exit 0; sleep 0.5; done
+exit 1

@@ -105,6 +105,7 @@ def chat(model, messages, stream_to=None):
     payload = json.dumps({'model': model, 'stream': stream_to is not None, 'messages': messages}).encode('utf-8')
     req = request.Request(API, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
     try:
+        subprocess.run(['/usr/lib/porygon/ollama-up'], check=False)  # starts Ollama on first use
         with request.urlopen(req, timeout=600) as response:
             if stream_to is None:
                 answer = json.load(response).get('message', {}).get('content')
@@ -124,7 +125,7 @@ def chat(model, messages, stream_to=None):
             raise RuntimeError(f'The AI tutor ({model}) is {missing("ai-tutor")}') from exc
         raise RuntimeError(f'Local Ollama error {exc.code}: {exc.reason}') from exc
     except (error.URLError, TimeoutError) as exc:
-        raise RuntimeError(f'Ollama is not running ({exc}): sudo systemctl enable --now ollama') from exc
+        raise RuntimeError(f'Ollama could not be started ({exc}): sudo systemctl start ollama') from exc
     if not isinstance(answer, str) or not answer:
         raise RuntimeError('Ollama returned no text response')
     return answer

@@ -36,6 +36,14 @@ British English and Russian, offline dictionaries) and an offline Russian course
   PipeWire and BlueZ when they report a change, and systemd's networkd,
   homed, nsresourced and mountfsd are masked (NetworkManager does networking).
   In the test VM this cut idle CPU from about 20% of a core to 6%.
+- **A short start-up list:** like Tachyon's boot set, only what Porygon needs
+  starts at boot (`/etc/systemd/system-preset/10-porygon.preset`: dbus, logind,
+  the clock, DNS, NetworkManager, Bluetooth, power profiles, thermald,
+  snapshots) and everything else stays off until you `sudo systemctl enable`
+  it. Ollama starts the first time Porygon-Z or the tutor needs it. Services
+  get 10 s to stop at shutdown, and the journal is capped at 50 MB.
+- **Notifications:** MaXX's dunst, in Porygon's colours. The brightness and
+  volume keys show a bar; low battery is a notification.
 - **Terminal:** MaXX's winterm running fish, with a Porygon-coloured prompt and
   short forms (`up` = upgrade, `in` = upgrade install, `undo`). The text
   consoles keep bash

@@ -188,10 +188,18 @@ class Status:
                                    (7, "Battery very low", f"{cap}% left. Plug in soon; Porygon will sleep at 3%.")):
             if cap <= level and level not in self.warned:
                 self.warned.add(level)
-                bg("porygon-nudge", title, body, "ok=OK")
+                self.notify(title, body, "critical" if level <= 7 else "normal")
         if cap <= 3 and 3 not in self.warned:
             self.warned.add(3)
-            bg("sh", "-c", "porygon-nudge 'Going to sleep' 'The battery is almost empty, so Porygon is going to sleep to keep your work safe.' ok=OK & sleep 20; systemctl suspend")
+            self.notify("Going to sleep", "The battery is almost empty, so Porygon is going to sleep in 20 seconds to keep your work safe.", "critical")
+            bg("sh", "-c", "sleep 20; systemctl suspend")
+
+    def notify(self, title, body, urgency="normal"):
+        """A notification (MaXX's dunst); a nudge window if notifications aren't running."""
+        if have("notify-send") and subprocess.run(["notify-send", "-a", "Porygon", "-u", urgency, title, body],
+                                                  stderr=subprocess.DEVNULL, timeout=5).returncode == 0:
+            return
+        bg("porygon-nudge", title, body, "ok=OK")
 
     # --- popups ------------------------------------------------------------
     def close_popup(self, *_):

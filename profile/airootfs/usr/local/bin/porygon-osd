@@ -1,0 +1,25 @@
+#!/bin/bash
+# porygon-osd - change brightness or volume and show it in a notification
+# with a bar (the laptop keys call this; dunst draws it).
+#   porygon-osd light up|down     porygon-osd vol up|down|mute     porygon-osd mic mute
+PATH=$PATH:/opt/MaXX/bin64   # MaXX brings its own dunst and dunstify
+ID=2747   # one notification that updates in place rather than piling up
+show() { # show TITLE PERCENT
+    command -v dunstify >/dev/null || return 0
+    dunstify -a Porygon -u low -r $ID -t 1500 -h "int:value:$2" "$1" "$2%"
+}
+case "$1 $2" in
+    "light up")   brightnessctl -q set +5% ;;
+    "light down") brightnessctl -q set 5%- ;;
+    "vol up")     pamixer -u -i 5 ;;
+    "vol down")   pamixer -d 5 ;;
+    "vol mute")   pamixer -t ;;
+    "mic mute")   pamixer --default-source -t
+                  dunstify -a Porygon -u low -r $ID -t 1500 "Microphone" "$(pamixer --default-source --get-mute | sed 's/true/muted/;s/false/on/')"; exit ;;
+esac
+case $1 in
+    light) show "Brightness" "$(brightnessctl -m | cut -d, -f4 | tr -d %)" ;;
+    vol)   if [ "$(pamixer --get-mute)" = true ]; then
+               dunstify -a Porygon -u low -r $ID -t 1500 -h int:value:0 "Volume" "muted"
+           else show "Volume" "$(pamixer --get-volume)"; fi ;;
+esac

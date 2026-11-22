@@ -27,6 +27,32 @@ for kind in Music Ambience; do
     done
 done
 
+# --- notifications (MaXX's dunst) in Porygon's colours, once -----------------
+D=$HOME/.maxxdesktop/dunstrc
+if [ -f "$D" ] && ! grep -q 'Porygon' "$D"; then
+    sed -i \
+        -e 's|^\(\s*\)frame_color = .*|\1frame_color = "#b04a68"|' \
+        -e 's|^\(\s*\)frame_width = .*|\1frame_width = 2|' \
+        -e 's|^\(\s*\)transparency = .*|\1transparency = 0|' \
+        -e 's|^\(\s*\)font = .*|\1font = DejaVu Sans 10|' \
+        -e 's|^\(\s*\)offset = .*|\1offset = 12x40|' \
+        -e 's|^\(\s*\)format = .*|\1format = "<b>%s</b>\\n%b"|' \
+        -e 's|^\(\s*\)progress_bar_height = .*|\1progress_bar_height = 8|' "$D"
+    python3 - "$D" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+colours = {"urgency_low": ("#d9d3dd", "#1a1020", "#5496ce"),
+           "urgency_normal": ("#d9d3dd", "#1a1020", "#ec849d"),
+           "urgency_critical": ("#ec849d", "#1a1020", "#b02030")}
+for sec, (bg, fg, frame) in colours.items():
+    s = re.sub(rf"(\[{sec}\][^\[]*?)background = \"[^\"]*\"", rf'\1background = "{bg}"', s, flags=re.S)
+    s = re.sub(rf"(\[{sec}\][^\[]*?)foreground = \"[^\"]*\"", rf'\1foreground = "{fg}"', s, flags=re.S)
+    s = re.sub(rf"(\[{sec}\])", rf'\1\n    frame_color = "{frame}"\n    highlight = "{frame}"', s, count=1) if "frame_color" not in re.search(rf"\[{sec}\][^\[]*", s).group(0) else s
+s = "# Porygon colours (porygon-setup-home)\n" + s
+open(p, "w").write(s)
+PY
+fi
+
 # --- MaXX's start-up list: the desk clock without a second hand ------------
 # (a second hand redraws the clock, and wakes the X server, every second)
 if [ -f "$HOME/.sgisession" ] && grep -q '^/usr/bin/xclock' "$HOME/.sgisession" && ! grep -q 'xclock.*-update' "$HOME/.sgisession"; then
