@@ -1,0 +1,24 @@
+#!/bin/bash
+# porygon-compositor - 5Dwm's built-in compositor, on or off.
+#   porygon-compositor off    off (Porygon's default: the desktop looks the
+#                             same, and the X server stops redrawing every
+#                             window off-screen, which saves power)
+#   porygon-compositor on     on
+#   porygon-compositor apply  at login: wait for 5Dwm, then apply your choice
+CONF=${XDG_CONFIG_HOME:-$HOME/.config}/porygon/desktop.conf
+TELL=/opt/MaXX/bin64/tellwm
+choice() { sed -n 's/^COMPOSITOR=//p' "$CONF" 2>/dev/null | tail -1; }
+save() { mkdir -p "${CONF%/*}"; { grep -v '^COMPOSITOR=' "$CONF" 2>/dev/null; echo "COMPOSITOR=$1"; } > "$CONF.new" && mv "$CONF.new" "$CONF"; }
+case ${1:-} in
+    on|off) save "$1"; "$TELL" "compositor_$1" ;;
+    apply)
+        # 5Dwm switches its compositor on as it starts, and only listens once
+        # it reaches its event loop (it says so in ~/.console)
+        for _ in $(seq 120); do
+            grep -q 'Entering Event Loop' "$HOME/.console" 2>/dev/null && break
+            sleep 1
+        done
+        sleep 2
+        "$TELL" "compositor_$(choice | grep -x on || echo off)" ;;
+    *) sed -n '2,7p' "$0"; echo "   now: $(choice || echo off)" ;;
+esac

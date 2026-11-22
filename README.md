@@ -30,6 +30,12 @@ British English and Russian, offline dictionaries) and an offline Russian course
   calendar). Low-battery warnings at 15% and 7%, sleep at 3%. NetworkManager,
   BlueZ, PipeWire, power-profiles-daemon, thermald, tap-to-click, brightness
   and volume keys
+- **Lean MaXX:** 5Dwm's compositor is switched off once it starts (the
+  desktop looks the same; `porygon-compositor on` brings it back), the desk
+  clock drops its second hand, the status strip only asks NetworkManager,
+  PipeWire and BlueZ when they report a change, and systemd's networkd,
+  homed, nsresourced and mountfsd are masked (NetworkManager does networking).
+  In the test VM this cut idle CPU from about 20% of a core to 6%.
 - **Terminal:** MaXX's winterm running fish, with a Porygon-coloured prompt and
   short forms (`up` = upgrade, `in` = upgrade install, `undo`). The text
   consoles keep bash

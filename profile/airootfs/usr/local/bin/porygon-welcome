@@ -121,9 +121,14 @@ PAGES = [
         "",
         "Want the original look back? Run porygon-theme off in a winterm; "
         "porygon-theme on brings Porygon back.",
+        "",
+        "5Dwm's compositor starts off: the desktop looks the same without it "
+        "and the battery lasts longer. Turn it on if a program draws badly.",
     ], [("Desktop Settings", lambda: run("/opt/MaXX/bin/desktop")),
         ("Porygon Colours", lambda: run("porygon-theme", "on")),
-        ("SGI Colours", lambda: run("porygon-theme", "off"))]),
+        ("SGI Colours", lambda: run("porygon-theme", "off")),
+        ("Compositor On", lambda: run("porygon-compositor", "on")),
+        ("Compositor Off", lambda: run("porygon-compositor", "off"))]),
     ("calm", "Wellbeing", "A Healthier Computer", [
         "Porygon tries to be good company rather than a slot machine.",
         "",
@@ -246,9 +251,10 @@ def show(key):
     text.configure(text="\n".join(lines))
     for w in actions.winfo_children():
         w.destroy()
-    for label, fn in acts:
+    for n, (label, fn) in enumerate(acts):
         tk.Button(actions, text=label, command=fn, bg=PANEL, activebackground=FIELD,
-                  bd=2, relief="raised", padx=10, pady=3, font=FONT_B).pack(side="left", padx=(0, 8))
+                  bd=2, relief="raised", padx=10, pady=3, font=FONT_B
+                  ).grid(row=n // 3, column=n % 3, sticky="we", padx=(0, 8), pady=(0, 6))
 
 
 for key, label, *_ in PAGES:

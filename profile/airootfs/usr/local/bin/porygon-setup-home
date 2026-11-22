@@ -27,6 +27,12 @@ for kind in Music Ambience; do
     done
 done
 
+# --- MaXX's start-up list: the desk clock without a second hand ------------
+# (a second hand redraws the clock, and wakes the X server, every second)
+if [ -f "$HOME/.sgisession" ] && grep -q '^/usr/bin/xclock' "$HOME/.sgisession" && ! grep -q 'xclock.*-update' "$HOME/.sgisession"; then
+    sed -i 's|^\(/usr/bin/xclock [^>]*\)>|\1-update 60 >|' "$HOME/.sgisession"
+fi
+
 # --- Toolchest: MaXX's menus plus Porygon's ---------------------------------
 make_chestrc() {
     local live=""; [ -d /run/archiso ] && live=1

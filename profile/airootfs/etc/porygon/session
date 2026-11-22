@@ -14,6 +14,8 @@ xbindkeys -f /etc/porygon/xbindkeysrc &
 porygon-wellbeing &
 # the status strip: Wi-Fi, Bluetooth, brightness, volume, battery, time
 porygon-status &
+# 5Dwm's compositor off once it has started (saves power; porygon-compositor on to undo)
+porygon-compositor apply &
 # started from a snapshot? offer to keep it
 /usr/lib/porygon/snapshot-check &
 (sleep 9; porygon-welcome --first-login) &
